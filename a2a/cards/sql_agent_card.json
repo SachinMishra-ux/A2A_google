@@ -1,0 +1,65 @@
+{
+  "name": "sql_database_agent",
+  "version": "1.0.0",
+  "description": "Enterprise database assistant built on LangChain and LangGraph. Executes read-only SQL queries against user account databases, strictly governed by Human-in-the-Loop (HITL) approval and automated PII redaction (Credit Cards & Emails).",
+  "supportedInterfaces": [
+    {
+      "protocol": "JSONRPC",
+      "version": "2.0",
+      "url": "http://127.0.0.1:8000/sql/a2a"
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "statefulSessions": true
+  },
+  "defaultInputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "query_user_accounts",
+      "name": "Secure Read-Only SQL Querying",
+      "description": "Executes SELECT queries against users database and returns tabular reports.",
+      "tags": [
+        "database",
+        "sql",
+        "sqlite",
+        "langchain"
+      ],
+      "examples": [
+        "What is Alice Smith's balance?",
+        "Fetch account records"
+      ]
+    },
+    {
+      "id": "hitl_pii_governance",
+      "name": "HITL Verification & PII Redaction",
+      "description": "Interrupts queries for human approval and automatically redacts credit cards and emails.",
+      "tags": [
+        "governance",
+        "security",
+        "hitl",
+        "pii-redaction"
+      ],
+      "examples": [
+        "Verify authorization for financial data queries"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "auth": {
+      "type": "none"
+    }
+  },
+  "provider": {
+    "organization": "A2A Multi-Agent Enterprise Ecosystem",
+    "standard": "Linux Foundation / Google A2A v1.0"
+  }
+}

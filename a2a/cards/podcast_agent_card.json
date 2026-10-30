@@ -1,0 +1,66 @@
+{
+  "name": "podcast_studio_agent",
+  "version": "1.0.0",
+  "description": "Executive Producer multi-agent system built on Google ADK. Orchestrates topic research, dialogue scriptwriting across specialized host personas (Alex, Morgan, Taylor), and neural audio synthesis via Microsoft Edge TTS.",
+  "supportedInterfaces": [
+    {
+      "protocol": "JSONRPC",
+      "version": "2.0",
+      "url": "http://127.0.0.1:8000/podcast/a2a"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "statefulSessions": true
+  },
+  "defaultInputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "application/json",
+    "audio/mpeg",
+    "text/markdown"
+  ],
+  "skills": [
+    {
+      "id": "generate_podcast_script",
+      "name": "Multi-Speaker Dialogue Scriptwriting",
+      "description": "Writes natural conversational dialogue turns between 2 or 3 host personas.",
+      "tags": [
+        "podcast",
+        "scriptwriting",
+        "creative-writing",
+        "adk"
+      ],
+      "examples": [
+        "Write a podcast episode discussing AI Agents",
+        "Create a technical debate script"
+      ]
+    },
+    {
+      "id": "synthesize_podcast_audio",
+      "name": "Neural Multi-Speaker MP3 Audio Synthesis",
+      "description": "Generates continuous multi-speaker audio tracks using Microsoft Neural voices.",
+      "tags": [
+        "audio",
+        "tts",
+        "mp3",
+        "speech-synthesis"
+      ],
+      "examples": [
+        "Generate speech audio for dialogue script"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "auth": {
+      "type": "none"
+    }
+  },
+  "provider": {
+    "organization": "A2A Multi-Agent Enterprise Ecosystem",
+    "standard": "Linux Foundation / Google A2A v1.0"
+  }
+}

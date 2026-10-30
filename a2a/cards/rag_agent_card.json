@@ -1,0 +1,64 @@
+{
+  "name": "rag_knowledge_agent",
+  "version": "1.0.0",
+  "description": "Retrieval-Augmented Generation agent built on LangChain and FAISS vector database. Performs semantic similarity search over indexed enterprise documentation and provides factually grounded answers with mandatory source citations.",
+  "supportedInterfaces": [
+    {
+      "protocol": "JSONRPC",
+      "version": "2.0",
+      "url": "http://127.0.0.1:8000/rag/a2a"
+    }
+  ],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "statefulSessions": true
+  },
+  "defaultInputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "defaultOutputModes": [
+    "text/plain",
+    "application/json"
+  ],
+  "skills": [
+    {
+      "id": "semantic_knowledge_retrieval",
+      "name": "FAISS Vector Similarity Search",
+      "description": "Retrieves relevant documentation passages based on semantic embedding similarity.",
+      "tags": [
+        "rag",
+        "faiss",
+        "vector-search",
+        "embeddings"
+      ],
+      "examples": [
+        "Explain Google Gemini architecture",
+        "How does FAISS work?"
+      ]
+    },
+    {
+      "id": "grounded_qa_with_citations",
+      "name": "Grounded QA with Citations",
+      "description": "Answers technical queries citing specific indexed source materials without hallucinations.",
+      "tags": [
+        "qa",
+        "citations",
+        "grounding"
+      ],
+      "examples": [
+        "What are the latest Gemini models?"
+      ]
+    }
+  ],
+  "securitySchemes": {
+    "auth": {
+      "type": "none"
+    }
+  },
+  "provider": {
+    "organization": "A2A Multi-Agent Enterprise Ecosystem",
+    "standard": "Linux Foundation / Google A2A v1.0"
+  }
+}
