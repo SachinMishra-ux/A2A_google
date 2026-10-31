@@ -102,6 +102,78 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ---
 
+## 🐳 Docker & Containerized Deployment
+
+The entire multi-agent cluster (SQL Agent, RAG Agent, Podcast Agent, A2A Gateway, and Web UI) can be built and run in a single production-ready Docker container.
+
+### 1. One-Command Launch (Docker Compose)
+
+```bash
+# Build image and start container in the background
+docker compose up -d --build
+
+# Verify container status and health check
+docker compose ps
+```
+
+The gateway, agent federation, and UI will automatically be available at **`http://localhost:8000/ui/`**.
+
+### 2. Standalone Docker Commands
+
+If you prefer using direct Docker CLI commands:
+
+```bash
+# Build the Docker image
+docker build -t a2a-gateway .
+
+# Run the container (maps port 8000 and loads .env)
+docker run -d \
+  --name a2a-gateway \
+  -p 8000:8000 \
+  --env-file .env \
+  a2a-gateway
+
+# Check container health and status
+docker ps --filter "name=a2a-gateway"
+```
+
+### 3. Container Pre-Warming & Startup Behavior
+
+When the container launches, `entrypoint.py` runs before opening traffic:
+- **SQL Database Agent**: Creates the in-memory SQLite schema and seeds test user records.
+- **RAG Knowledge Agent**: Builds and indexes the FAISS vector database with document chunks.
+- **Podcast Studio Agent**: Initializes the Google ADK root agent coordinator and host personas.
+- **Uvicorn Gateway**: Binds to `0.0.0.0:8000` exposing all JSON-RPC 2.0 endpoints and the Material UI.
+
+### 4. Useful Docker Management Commands
+
+```bash
+# Stream live logs from the multi-agent container
+docker logs -f a2a-gateway
+
+# Inspect health check status
+docker inspect --format='{{json .State.Health}}' a2a-gateway | jq .
+
+# Test A2A discovery endpoint from the host
+curl -s http://localhost:8000/.well-known/agent-card.json | jq .
+
+# Test query routing via curl
+curl -s -X POST http://localhost:8000/api/route \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Show me all users in the database"}' | jq .
+
+# Execute an interactive shell inside the container
+docker exec -it a2a-gateway bash
+
+# Restart the container
+docker compose restart
+
+# Stop and remove the container
+docker compose down
+```
+
+---
+
 ## 🖥️ Interactive Web UI & Live Protocol Inspector
 
 You can launch and interact with all agents via a visual Google Material Design web interface:
