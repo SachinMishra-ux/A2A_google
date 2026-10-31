@@ -494,33 +494,87 @@
           </div>
         </div>
 
-        <h3 style="font-family: 'Google Sans', sans-serif; margin: 1.5rem 0 0.5rem;">A2A vs. MCP: The Clear Difference</h3>
+        <h3 style="font-family: 'Google Sans', sans-serif; margin: 1.5rem 0 0.5rem;">A2A vs. MCP: Why Both Use JSON-RPC 2.0 and How They Differ</h3>
+        <p style="font-size: 0.92rem; color: var(--g-text); margin-bottom: 1rem;">
+          A common question is: <em>"Does A2A use JSON-RPC 2.0 because MCP uses the same protocol?"</em><br>
+          <strong>Yes, both use JSON-RPC 2.0 as their wire format, but they solve entirely different problems in the AI stack:</strong>
+          JSON-RPC 2.0 is an open, lightweight, transport-agnostic standard that gives both protocols request/response tracking (<code>id</code>), structured error handling (<code>code</code>, <code>message</code>), and streaming notifications. However, their architectural responsibilities are completely separate:
+        </p>
         <table class="styled-table">
           <thead>
             <tr>
-              <th>Layer</th>
-              <th>Model Context Protocol (MCP)</th>
-              <th>Agent-to-Agent Protocol (A2A)</th>
+              <th>Dimension</th>
+              <th>Anthropic MCP (Model Context Protocol)</th>
+              <th>Google A2A (Agent2Agent Protocol)</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td><strong>Relationship</strong></td>
-              <td>Agent &harr; <strong>Tool</strong> (Database, GitHub, Filesystem)</td>
-              <td>Agent &harr; <strong>Agent</strong> (Autonomous System to Autonomous System)</td>
+              <td><strong>Primary Relationship</strong></td>
+              <td><strong>Host-to-Tool / Client-to-Resource</strong> (1:N tools)</td>
+              <td><strong>Agent-to-Agent / Peer-to-Peer</strong> (Collaborative federation)</td>
             </tr>
             <tr>
-              <td><strong>Execution</strong></td>
-              <td>Stateless, immediate RPC tool execution</td>
-              <td>Stateful, multi-turn task delegation and artifact handoff</td>
+              <td><strong>Who Reasons?</strong></td>
+              <td>❌ <strong>No reasoning on server</strong>. Tool servers are passive functions returning raw text/data.</td>
+              <td>✅ <strong>Both sides have cognitive loops</strong>. Recipient agent runs its own LLM, prompts, and planners.</td>
             </tr>
             <tr>
-              <td><strong>Visibility</strong></td>
-              <td>Transparent: Tool schema injected directly into agent's prompt</td>
-              <td>Opaque: Remote agent's internal prompts and weights remain strictly private</td>
+              <td><strong>Operation Granularity</strong></td>
+              <td><strong>Micro-operations</strong>: <code>tools/call</code>, <code>resources/read</code>, <code>prompts/get</code></td>
+              <td><strong>Macro-missions</strong>: <code>message/send</code>, <code>tasks/create</code>, <code>tasks/get</code></td>
+            </tr>
+            <tr>
+              <td><strong>Boundary Opacity</strong></td>
+              <td><strong>Transparent</strong>: Host sees function signatures, arguments, and handles tool errors.</td>
+              <td><strong>Opaque</strong>: Caller delegates a goal; callee's internal prompts, model weights, and tools are hidden.</td>
+            </tr>
+            <tr>
+              <td><strong>Deliverables</strong></td>
+              <td>Raw string / JSON returned into the LLM prompt</td>
+              <td>Structured <strong>Artifacts</strong> (scripts, audio, databases) attached to a stateful <strong>Task</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Discovery</strong></td>
+              <td>Tool schemas via <code>tools/list</code></td>
+              <td><strong>Agent Card</strong> at <code>/.well-known/agent-card.json</code> declaring skills and input modes</td>
             </tr>
           </tbody>
         </table>
+
+        <!-- How A2A Decides Which Agent to Invoke -->
+        <h3 style="font-family: 'Google Sans', sans-serif; margin: 2rem 0 0.5rem; color: var(--g-blue);">
+          🎯 How A2A Understands User Queries & Routes to the Right Agent
+        </h3>
+        <p style="font-size: 0.92rem; color: var(--g-text); margin-bottom: 1rem;">
+          In A2A, routing is <strong>never hardcoded</strong>. The Gateway or Orchestrator uses a 3-step <strong>Capability Matching Engine</strong>:
+        </p>
+
+        <div class="grid-3" style="margin-bottom: 1.5rem;">
+          <div style="background: #f8f9fa; border: 1px solid var(--g-border); border-radius: 8px; padding: 1rem;">
+            <div style="font-weight: 600; color: var(--g-blue); font-size: 0.9rem;">1. Agent Card Inspection</div>
+            <p style="font-size: 0.82rem; color: var(--g-muted); margin-top: 4px;">
+              The Gateway reads the published <strong>Agent Cards</strong> at <code>/.well-known/agent-card.json</code>. Each card advertises specific skills (e.g. <code>Secure Read-Only SQL Querying</code>, <code>FAISS Knowledge Retrieval</code>, <code>Podcast Dialogue Synthesis</code>).
+            </p>
+          </div>
+          <div style="background: #f8f9fa; border: 1px solid var(--g-border); border-radius: 8px; padding: 1rem;">
+            <div style="font-weight: 600; color: var(--g-green); font-size: 0.9rem;">2. Semantic Intent Matching</div>
+            <p style="font-size: 0.82rem; color: var(--g-muted); margin-top: 4px;">
+              The incoming query is evaluated against all advertised skills. Match scores (0–100%) and confidence ratings are calculated for every candidate agent.
+            </p>
+          </div>
+          <div style="background: #f8f9fa; border: 1px solid var(--g-border); border-radius: 8px; padding: 1rem;">
+            <div style="font-weight: 600; color: var(--g-yellow); font-size: 0.9rem;">3. JSON-RPC Dispatch / Composite Orchestration</div>
+            <p style="font-size: 0.82rem; color: var(--g-muted); margin-top: 4px;">
+              If a single agent dominates, a direct <code>message/send</code> payload is dispatched. If the query spans multiple domains (e.g. database + podcast), the <strong>Multi-Agent Orchestrator</strong> executes a sequential pipeline.
+            </p>
+          </div>
+        </div>
+
+        <div style="background: #e8f0fe; border-left: 4px solid var(--g-blue); border-radius: 6px; padding: 1rem; font-size: 0.88rem; color: #174ea6;">
+          <strong>⚡ Real Agent Invocation vs. Deterministic Fallbacks:</strong><br>
+          When an agent is invoked, it runs its real internal framework: <strong>Google ADK (Agent Development Kit)</strong> for the Podcast Agent and <strong>LangChain + LangGraph</strong> for the SQL and RAG agents. If your Google Gemini API key has an active billing account, a live LLM call is made to Gemini. If the API returns HTTP 403 (due to an outstanding balance on Google AI Studio), the agents safely capture the live API error and execute deterministic SQLite tools, PII masking, and FAISS vector retrieval so your system never crashes!
+        </div>
       </div>
     </div>
 

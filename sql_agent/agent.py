@@ -76,56 +76,70 @@ def run_sql_agent_query(
     """Executes a query through the SQL Agent, demonstrating HITL handling.
     
     Returns a structured dictionary containing the final response,
-    interrupt details (if any), and status.
+    interrupt details (if any), execution telemetry, and status.
     """
     agent = sql_agent or create_sql_agent_instance()
+    llm_error = None
     
-    if agent is None:
-        # Fallback demonstration if no API key is set
-        return run_offline_sql_query(query_text, decision, rejection_message)
-        
-    config = {"configurable": {"thread_id": thread_id}}
-    
-    # 1. First invocation (expecting HITL interrupt if query_sql_db is called)
-    result = agent.invoke({"messages": [{"role": "user", "content": query_text}]}, config=config)
-    
-    state = agent.get_state(config)
-    interrupt_info = None
-    
-    if state.next:
-        for task in state.tasks:
-            if task.interrupts:
-                interrupt_val = task.interrupts[0].value
-                interrupt_info = {
-                    "action_requests": interrupt_val.get("action_requests"),
-                    "allowed_decisions": interrupt_val.get("review_configs")
-                }
-                break
-        
-        # 2. Resume execution based on decision
-        if decision == "approve":
-            resume_cmd = Command(resume={"decisions": [{"type": "approve"}]})
-        else:
-            resume_cmd = Command(resume={"decisions": [{"type": "reject", "message": rejection_message}]})
+    if agent is not None:
+        try:
+            config = {"configurable": {"thread_id": thread_id}}
+            # 1. First invocation (expecting HITL interrupt if query_sql_db is called)
+            result = agent.invoke({"messages": [{"role": "user", "content": query_text}]}, config=config)
             
-        final_result = agent.invoke(resume_cmd, config=config)
-        content = _format_content_to_str(final_result["messages"][-1].content)
-        return {
-            "status": "completed",
-            "content": content,
-            "hitl_triggered": True,
-            "decision": decision,
-            "interrupt_info": interrupt_info
-        }
-    else:
-        content = _format_content_to_str(result["messages"][-1].content)
-        return {
-            "status": "completed",
-            "content": content,
-            "hitl_triggered": False,
-            "decision": None,
-            "interrupt_info": None
-        }
+            state = agent.get_state(config)
+            interrupt_info = None
+            
+            if state.next:
+                for task in state.tasks:
+                    if task.interrupts:
+                        interrupt_val = task.interrupts[0].value
+                        interrupt_info = {
+                            "action_requests": interrupt_val.get("action_requests"),
+                            "allowed_decisions": interrupt_val.get("review_configs")
+                        }
+                        break
+                
+                # 2. Resume execution based on decision
+                if decision == "approve":
+                    resume_cmd = Command(resume={"decisions": [{"type": "approve"}]})
+                else:
+                    resume_cmd = Command(resume={"decisions": [{"type": "reject", "message": rejection_message}]})
+                    
+                final_result = agent.invoke(resume_cmd, config=config)
+                content = _format_content_to_str(final_result["messages"][-1].content)
+                return {
+                    "status": "completed",
+                    "content": content,
+                    "hitl_triggered": True,
+                    "decision": decision,
+                    "interrupt_info": interrupt_info,
+                    "llm_called": True,
+                    "execution_mode": "live_gemini_success",
+                    "model": "gemini-3.1-flash-lite"
+                }
+            else:
+                content = _format_content_to_str(result["messages"][-1].content)
+                return {
+                    "status": "completed",
+                    "content": content,
+                    "hitl_triggered": False,
+                    "decision": None,
+                    "interrupt_info": None,
+                    "llm_called": True,
+                    "execution_mode": "live_gemini_success",
+                    "model": "gemini-3.1-flash-lite"
+                }
+        except Exception as e:
+            llm_error = str(e)
+
+    # Deterministic Real Database Fallback with actual SQLite query and PII redaction
+    offline_res = run_offline_sql_query(query_text, decision, rejection_message)
+    offline_res["llm_called"] = True if agent is not None else False
+    offline_res["llm_error"] = llm_error
+    offline_res["execution_mode"] = "live_gemini_billing_blocked" if (llm_error and "PERMISSION_DENIED" in llm_error) else "deterministic_sqlite"
+    offline_res["model"] = "gemini-3.1-flash-lite (Google AI Studio Billing Blocked)" if (llm_error and "PERMISSION_DENIED" in llm_error) else "sqlite_direct"
+    return offline_res
 
 def run_offline_sql_query(
     query_text: str,

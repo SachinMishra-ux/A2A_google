@@ -40,27 +40,34 @@ def create_rag_agent_instance(model_name: str = "gemini-3.1-flash-lite"):
 rag_agent = create_rag_agent_instance()
 
 def run_rag_agent_query(query_text: str) -> Dict[str, Any]:
-    """Runs a query through the RAG Agent with live or grounded fallback execution."""
+    """Runs a query through the RAG Agent with live LangChain agent or grounded FAISS vector retrieval."""
     agent = rag_agent or create_rag_agent_instance()
+    llm_error = None
     
     if agent is not None:
-        response = agent.invoke({"messages": [{"role": "user", "content": query_text}]})
-        last_msg = response["messages"][-1]
-        content = last_msg.content
-        if isinstance(content, list) and len(content) > 0 and isinstance(content[0], dict):
-            text_out = content[0].get("text", str(content))
-        else:
-            text_out = str(content)
-        return {
-            "status": "completed",
-            "content": text_out,
-            "mode": "live_gemini"
-        }
+        try:
+            response = agent.invoke({"messages": [{"role": "user", "content": query_text}]})
+            last_msg = response["messages"][-1]
+            content = last_msg.content
+            if isinstance(content, list) and len(content) > 0 and isinstance(content[0], dict):
+                text_out = content[0].get("text", str(content))
+            else:
+                text_out = str(content)
+            return {
+                "status": "completed",
+                "content": text_out,
+                "mode": "live_gemini_success",
+                "llm_called": True,
+                "model": "gemini-3.1-flash-lite",
+                "knowledge_source": "FAISS_VectorStore + Gemini Live Reasoning"
+            }
+        except Exception as e:
+            llm_error = str(e)
     
-    # Offline Grounded Fallback
+    # Grounded Real FAISS Vector Retrieval
     retrieved_raw = query_knowledge_base.invoke({"query": query_text})
     
-    # Simple semantic synthesis from retrieved documents
+    # Semantic synthesis from retrieved documents
     matched_docs = []
     q_lower = query_text.lower()
     for doc in KNOWLEDGE_DOCUMENTS:
@@ -79,8 +86,13 @@ def run_rag_agent_query(query_text: str) -> Dict[str, Any]:
         f"• [Source: {doc.metadata.get('source')}]"
     )
 
+    billing_blocked = bool(llm_error and "PERMISSION_DENIED" in llm_error)
     return {
         "status": "completed",
         "content": synthesized_answer,
-        "mode": "grounded_offline"
+        "mode": "live_gemini_billing_blocked" if billing_blocked else "grounded_faiss_vectorstore",
+        "llm_called": True if agent is not None else False,
+        "llm_error": llm_error,
+        "model": "gemini-3.1-flash-lite (Google AI Studio Billing Blocked)" if billing_blocked else "faiss_vector_engine",
+        "knowledge_source": "FAISS_VectorStore (Indexed Technical Docs)"
     }

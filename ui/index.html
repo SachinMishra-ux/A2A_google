@@ -22,9 +22,24 @@
         </div>
         <h1>Google A2A Protocol <span style="font-weight:400; color:var(--g-muted); font-size:0.95rem; margin-left:6px;">Agent Gateway & Live Inspector</span></h1>
       </div>
-      <div class="status-pill" id="protocol-status">
-        <span class="status-dot"></span>
-        <span>A2A Protocol Ready (JSON-RPC 2.0)</span>
+      
+      <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+        <!-- A2A vs MCP Explainer Button -->
+        <button id="btn-mcp-modal" class="pill-btn">
+          <span>📘 A2A vs MCP Protocol</span>
+        </button>
+
+        <!-- API Key Status Pill -->
+        <button id="btn-key-modal" class="pill-btn" style="border-color:#dadce0;">
+          <span id="key-dot" class="status-dot" style="background:#f9ab00;"></span>
+          <span id="key-status-text">Checking API Key...</span>
+        </button>
+
+        <!-- Protocol Ready Indicator -->
+        <div class="status-pill" id="protocol-status">
+          <span class="status-dot"></span>
+          <span>A2A Protocol Ready (JSON-RPC 2.0)</span>
+        </div>
       </div>
     </div>
   </header>
@@ -76,7 +91,7 @@
         <h2>Enter Query or Mission</h2>
         <!-- Routing Mode Selectors -->
         <div class="mode-selector">
-          <button class="mode-btn active" data-mode="auto">✨ Auto Route (A2A Intent Classifier)</button>
+          <button class="mode-btn active" data-mode="auto">✨ Auto Route (A2A Intent & Card Matcher)</button>
           <button class="mode-btn" data-mode="sql">🗄️ SQL Agent</button>
           <button class="mode-btn" data-mode="rag">📚 RAG Agent</button>
           <button class="mode-btn" data-mode="podcast">🎙️ Podcast Agent</button>
@@ -113,9 +128,24 @@
         <!-- Dynamic Agent Badge Banner -->
         <div id="agent-badge-banner" class="agent-badge-banner" style="display:none;">
           <div id="agent-badge-icon" style="font-size:1.4rem;">✨</div>
-          <div>
+          <div style="flex:1;">
             <strong id="agent-badge-title" style="font-size:0.95rem;">Routed Agent</strong>
             <p id="agent-badge-desc" style="font-size:0.8rem; color:var(--g-muted); margin:0;">A2A Protocol Dispatch</p>
+          </div>
+          <!-- Execution Engine Pill -->
+          <div id="execution-engine-pill" class="engine-badge" style="display:none;">
+            <span id="engine-icon">⚙️</span>
+            <span id="engine-text">Real Agent Runtime</span>
+          </div>
+        </div>
+
+        <!-- Warning Callout if Google AI Studio Billing is Blocked -->
+        <div id="billing-warning-callout" class="billing-callout" style="display:none;">
+          <div style="font-weight:600; color:#b06000; display:flex; align-items:center; gap:6px;">
+            <span>⚠️</span> Real Agent Invocation Notice
+          </div>
+          <div style="font-size:0.82rem; color:#5f6368; margin-top:4px;" id="billing-warning-msg">
+            The agent executed its live framework pipeline (Google ADK / LangGraph). Google Gemini API returned HTTP 403 because your Google AI Studio billing account has an outstanding balance. Deterministic tools &amp; verified fallbacks were executed.
           </div>
         </div>
 
@@ -124,11 +154,11 @@
 Welcome to the Google A2A Protocol Interactive Workspace!
 
 Enter a prompt above or click one of the quick suggestions. The A2A protocol will:
-1. Inspect the incoming request and classify intent.
-2. Locate the registered Agent Card (Agent Capabilities, Skills, Input/Output Schemas).
-3. Dispatch a standard JSON-RPC 2.0 request (`tasks/send`).
-4. Execute the agent runtime (LangChain / Google ADK / Multi-Agent Supervisor).
-5. Stream step-by-step telemetry, artifacts, and outputs in real time on the right!
+1. Inspect the incoming request and evaluate all registered Agent Cards.
+2. Dynamically resolve the best-suited agent based on advertised skills.
+3. Dispatch a standard JSON-RPC 2.0 request (`message/send` / `tasks/create`).
+4. Execute the real specialist agent runtime (LangChain / Google ADK).
+5. Stream step-by-step telemetry, artifacts, and protocol payloads in real time on the right!
         </div>
 
         <!-- Artifacts Section -->
@@ -158,17 +188,114 @@ Enter a prompt above or click one of the quick suggestions. The A2A protocol wil
 
         <!-- Sub Tabs for Telemetry Inspector -->
         <div class="telemetry-tabs">
-          <div class="t-tab active" data-tab="json-request">JSON-RPC Request</div>
+          <div class="t-tab active" data-tab="card-matrix">Card Match Matrix</div>
+          <div class="t-tab" data-tab="json-request">JSON-RPC Request</div>
           <div class="t-tab" data-tab="json-response">JSON-RPC Response</div>
           <div class="t-tab" data-tab="agent-card">Agent Card</div>
           <div class="t-tab" data-tab="trace-summary">Full Trace</div>
         </div>
 
         <!-- Tab Content Viewers -->
-        <pre id="code-viewer" class="code-viewer">// Telemetry will display live JSON-RPC 2.0 payloads, Agent Cards, and lifecycle events here.</pre>
+        <div id="matrix-container" class="matrix-container" style="display:block;">
+          <div style="font-size:0.85rem; color:var(--g-muted); margin-bottom:0.75rem;">
+            A2A capability matching evaluates your mission against all published Agent Cards:
+          </div>
+          <div id="matrix-cards-list">
+            <div style="color:var(--g-muted); font-size:0.8rem; font-style:italic;">Run a query to view live card evaluations.</div>
+          </div>
+        </div>
+
+        <pre id="code-viewer" class="code-viewer" style="display:none;">// Telemetry will display live JSON-RPC 2.0 payloads, Agent Cards, and lifecycle events here.</pre>
       </section>
     </div>
   </main>
+
+  <!-- Modal: A2A vs MCP Deep Dive -->
+  <div id="mcp-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Google A2A vs Anthropic MCP: Protocol Comparison</h3>
+        <button class="modal-close" onclick="closeModal('mcp-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:1rem; font-size:0.9rem; color:var(--g-dark);">
+          <strong>Why do both A2A and MCP use JSON-RPC 2.0?</strong><br>
+          JSON-RPC 2.0 is an open, lightweight, transport-agnostic standard that provides request/response correlation (<code>id</code>), structured error codes (<code>code</code>, <code>message</code>), and optional batching. However, <strong>A2A</strong> and <strong>MCP</strong> operate at fundamentally different architectural layers:
+        </p>
+
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Anthropic MCP (Model Context Protocol)</th>
+              <th>Google A2A (Agent2Agent Protocol)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Primary Relationship</strong></td>
+              <td><strong>Host-to-Tool / Client-to-Resource</strong> (1:N tools)</td>
+              <td><strong>Agent-to-Agent / Peer-to-Peer</strong> (Collaborative federation)</td>
+            </tr>
+            <tr>
+              <td><strong>Autonomous Reasoning</strong></td>
+              <td>❌ <strong>No reasoning on server</strong>. Tool servers are passive functions returning data.</td>
+              <td>✅ <strong>Both sides have cognitive loops</strong>. The recipient agent runs its own models, planners, and tools.</td>
+            </tr>
+            <tr>
+              <td><strong>Task Granularity</strong></td>
+              <td><strong>Micro-operations</strong>: <code>tools/call</code>, <code>resources/read</code>, <code>prompts/get</code></td>
+              <td><strong>Macro-missions</strong>: <code>message/send</code>, <code>tasks/create</code>, <code>tasks/get</code></td>
+            </tr>
+            <tr>
+              <td><strong>Boundary Opacity</strong></td>
+              <td><strong>Transparent</strong>: Client inspects every function signature and raw output.</td>
+              <td><strong>Opaque</strong>: Internal prompts, weights, and tools are hidden; only deliverable <strong>Artifacts</strong> are returned.</td>
+            </tr>
+            <tr>
+              <td><strong>Discovery Manifest</strong></td>
+              <td>Tool schemas via <code>tools/list</code></td>
+              <td><strong>Agent Card</strong> at <code>/.well-known/agent-card.json</code> declaring skills, capabilities, and TOS</td>
+            </tr>
+            <tr>
+              <td><strong>Cross-Framework Interop</strong></td>
+              <td>Standardizes tool interfaces for an LLM</td>
+              <td>Connects heterogeneous agents (e.g. <strong>Google ADK</strong> $\leftrightarrow$ <strong>LangChain</strong>)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="background:#e8f0fe; border-left:4px solid #1a73e8; padding:10px 14px; border-radius:6px; margin-top:1rem; font-size:0.85rem; color:#174ea6;">
+          <strong>Summary:</strong> Use <strong>MCP</strong> when your agent needs to connect to local tools (file system, database driver, git CLI). Use <strong>A2A</strong> when your agent needs to collaborate with another specialized, autonomous agent across team or organizational boundaries.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: API Key Update -->
+  <div id="key-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-dialog" style="max-width:520px;">
+      <div class="modal-header">
+        <h3>Google Gemini API Key Status</h3>
+        <button class="modal-close" onclick="closeModal('key-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="key-modal-status-box" style="padding:10px 12px; border-radius:6px; margin-bottom:1rem; font-size:0.85rem;">
+          Checking key...
+        </div>
+
+        <label style="font-size:0.85rem; font-weight:600; color:var(--g-dark); display:block; margin-bottom:6px;">
+          Update or Enter New Gemini API Key:
+        </label>
+        <input type="password" id="input-api-key" placeholder="AIzaSy... (or paste fresh Gemini API key)" style="width:100%; padding:8px 12px; font-size:0.9rem; border:1px solid #dadce0; border-radius:6px; box-sizing:border-box; margin-bottom:1rem;" />
+
+        <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+          <button class="mode-btn" onclick="closeModal('key-modal')">Cancel</button>
+          <button id="btn-save-key" class="submit-btn" style="padding:0.4rem 1.2rem; font-size:0.85rem;">Save &amp; Verify Key</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer>

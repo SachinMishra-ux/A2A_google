@@ -133,7 +133,11 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
                     "hitl_triggered": sql_res.get("hitl_triggered"),
                     "decision": sql_res.get("decision"),
                     "security_policy": "PII_Redacted",
-                    "framework": "LangChain/LangGraph"
+                    "framework": "LangChain/LangGraph",
+                    "execution_mode": sql_res.get("execution_mode"),
+                    "model": sql_res.get("model"),
+                    "llm_called": sql_res.get("llm_called"),
+                    "llm_error": sql_res.get("llm_error")
                 }
             )
         )
@@ -154,8 +158,12 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
                 parts=[Part(text=content)],
                 metadata={
                     "mode": rag_res.get("mode"),
-                    "knowledge_source": "FAISS_VectorStore",
-                    "framework": "LangChain"
+                    "knowledge_source": rag_res.get("knowledge_source", "FAISS_VectorStore"),
+                    "framework": "LangChain",
+                    "execution_mode": rag_res.get("mode"),
+                    "model": rag_res.get("model"),
+                    "llm_called": rag_res.get("llm_called"),
+                    "llm_error": rag_res.get("llm_error")
                 }
             )
         )
@@ -163,49 +171,72 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
 
     # ── CASE C: PODCAST AGENT (Google ADK - Agent Development Kit) ────────────
     elif agent_name in ("podcast", "podcast_agent"):
-        # Invokes the Google ADK Podcast Studio pipeline.
-        # It extracts topics from the incoming prompt, creates an Episode Plan,
-        # and casts personas (Alex as Host, Morgan as Specialist).
+        # Invokes the real Google ADK Podcast Studio pipeline.
+        # It initializes the InMemoryRunner with root_agent, attempting live Gemini execution.
         clean_topic = query_text.replace("Generate a podcast episode for:", "").strip()
-        
-        plan = PodcastPlan(
-            episode_title=f"The Frontier of AI: {clean_topic[:45]}",
-            target_audience="Engineers & Product Leaders",
-            core_topics=[clean_topic, "Architecture Patterns", "Production Deployments"],
-            speaker_count=2,
-            speaker_profiles=[
-                SpeakerProfile(name="Alex", role="Host", tone="Dynamic, inquisitive", voice_id="en-US-GuyNeural"),
-                SpeakerProfile(name="Morgan", role="Specialist", tone="Authoritative, detailed", voice_id="en-US-JennyNeural")
+        from google.adk.runners import InMemoryRunner
+        from podcast_agent.agent import root_agent
+
+        runner = InMemoryRunner(agent=root_agent)
+        llm_error = None
+        adk_live_text = None
+
+        try:
+            # 1. Attempt live execution through the Google ADK Coordinator & Subagents
+            adk_res = asyncio.run(runner.run_debug(clean_topic))
+            adk_live_text = str(adk_res)
+            script_text = f"# 🎙️ Live Google ADK Podcast Episode: {clean_topic[:45]}\n\n{adk_live_text}"
+            execution_mode = "live_google_adk_success"
+            model_info = "gemini-3.1-flash-lite (Google ADK Live)"
+        except Exception as e:
+            llm_error = str(e)
+            billing_blocked = "outstanding balance" in llm_error or "PERMISSION_DENIED" in llm_error
+            execution_mode = "live_adk_billing_blocked" if billing_blocked else "adk_local_fallback"
+            model_info = "gemini-3.1-flash-lite (Google AI Studio Billing Blocked)" if billing_blocked else "google_adk_local"
+
+            # 2. Formulate dynamic topic-specific podcast plan
+            plan = PodcastPlan(
+                episode_title=f"The Frontier of AI: {clean_topic[:45]}",
+                target_audience="Engineers & Product Leaders",
+                core_topics=[clean_topic, "Architecture Patterns", "Production Deployments"],
+                speaker_count=2,
+                speaker_profiles=[
+                    SpeakerProfile(name="Alex", role="Host", tone="Dynamic, inquisitive", voice_id="en-US-GuyNeural"),
+                    SpeakerProfile(name="Morgan", role="Specialist", tone="Authoritative, detailed", voice_id="en-US-JennyNeural")
+                ]
+            )
+
+            turns = [
+                DialogueTurn(speaker="Alex", text=f"Welcome to AI Systems Spotlight! Today we dive deep into: {clean_topic}."),
+                DialogueTurn(speaker="Morgan", text="Glad to be here Alex. This synthesis connects real-world data security with multimodal capabilities seamlessly."),
+                DialogueTurn(speaker="Alex", text=f"Looking at the findings for '{clean_topic}', the synergy between grounded retrieval and verified database records is game-changing."),
+                DialogueTurn(speaker="Morgan", text="Exactly. That is where standard protocols like A2A make heterogeneous agents truly shine.")
             ]
-        )
+            
+            script = PodcastScript(
+                episode_title=plan.episode_title,
+                speaker_count=2,
+                turns=turns
+            )
 
-        turns = [
-            DialogueTurn(speaker="Alex", text=f"Welcome to AI Systems Spotlight! Today we dive deep into: {clean_topic}."),
-            DialogueTurn(speaker="Morgan", text="Glad to be here Alex. This synthesis connects real-world data security with multimodal capabilities seamlessly."),
-            DialogueTurn(speaker="Alex", text="Looking at the findings, the synergy between grounded retrieval and verified database records is game-changing."),
-            DialogueTurn(speaker="Morgan", text="Exactly. That is where standard protocols like A2A make heterogeneous agents truly shine.")
-        ]
-        
-        script = PodcastScript(
-            episode_title=plan.episode_title,
-            speaker_count=2,
-            turns=turns
-        )
+            script_text = f"# 🎙️ Podcast Episode: {script.episode_title}\n\n"
+            for t in script.turns:
+                script_text += f"**[{t.speaker}]**: {t.text}\n\n"
 
-        script_text = f"# 🎙️ Podcast Episode: {script.episode_title}\n\n"
-        for t in script.turns:
-            script_text += f"**[{t.speaker}]**: {t.text}\n\n"
-
-        # Package deliverable as an A2A Artifact containing both raw JSON data and formatted markdown
+        # Package deliverable as an A2A Artifact containing script and execution telemetry
         artifacts.append(
             Artifact(
                 name="Podcast_Dialogue_Script.json",
-                parts=[Part(data=script.model_dump(), text=script_text)],
+                parts=[Part(text=script_text)],
                 metadata={
                     "speaker_count": 2,
                     "voice_cast": {"Alex": "en-US-GuyNeural", "Morgan": "en-US-JennyNeural"},
                     "runtime_est_seconds": 90,
-                    "framework": "Google ADK"
+                    "framework": "Google ADK (Agent Development Kit)",
+                    "execution_mode": execution_mode,
+                    "model": model_info,
+                    "llm_called": True,
+                    "llm_error": llm_error
                 }
             )
         )
@@ -389,6 +420,54 @@ def create_gateway_app() -> FastAPI:
         
         base_url = str(request.base_url).rstrip("/")
         return await route_and_execute(query=query, mode=mode, base_url=base_url)
+
+    # API Key Inspection and Hot-Update Endpoint
+    @app.get("/api/key-status")
+    def api_get_key_status():
+        key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not key:
+            return {"status": "missing", "masked": "", "message": "No API key configured in .env."}
+        
+        masked = key[:6] + "..." + key[-4:] if len(key) > 10 else "***"
+        # Check if key is blocked by billing
+        from google import genai
+        try:
+            client = genai.Client()
+            client.models.generate_content(model="gemini-2.5-flash", contents="ping")
+            return {"status": "active", "masked": masked, "message": "Gemini API key is active and live calls are functional."}
+        except Exception as e:
+            err_str = str(e)
+            if "outstanding balance" in err_str or "PERMISSION_DENIED" in err_str:
+                return {
+                    "status": "billing_blocked",
+                    "masked": masked,
+                    "message": "Google AI Studio billing account has an outstanding balance. Visit https://aistudio.google.com/billing to resolve, or enter a new API key below."
+                }
+            return {"status": "error", "masked": masked, "message": f"API key error: {err_str[:150]}"}
+
+    @app.post("/api/set-key")
+    async def api_set_key(request: Request):
+        payload = await request.json()
+        new_key = payload.get("key", "").strip()
+        if not new_key:
+            raise HTTPException(status_code=400, detail="API key cannot be empty.")
+
+        os.environ["GEMINI_API_KEY"] = new_key
+        os.environ["GOOGLE_API_KEY"] = new_key
+
+        # Persist to .env
+        env_path = PROJECT_ROOT / ".env"
+        with open(env_path, "w") as f:
+            f.write(f'GEMINI_API_KEY="{new_key}"\nGOOGLE_API_KEY="{new_key}"\n')
+
+        # Re-test key
+        from google import genai
+        try:
+            client = genai.Client()
+            client.models.generate_content(model="gemini-2.5-flash", contents="ping")
+            return {"success": True, "status": "active", "message": "API key successfully updated and verified live with Gemini!"}
+        except Exception as e:
+            return {"success": False, "status": "billing_blocked" if "PERMISSION_DENIED" in str(e) else "error", "message": str(e)}
 
     # API Agents List Endpoint
     @app.get("/api/agents")

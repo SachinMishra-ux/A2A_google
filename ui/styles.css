@@ -491,6 +491,167 @@ main {
   line-height: 1.45;
 }
 
+/* Header Action Pill Buttons */
+.pill-btn {
+  background: #ffffff;
+  border: 1px solid var(--g-blue);
+  color: var(--g-blue);
+  padding: 0.35rem 0.8rem;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.pill-btn:hover {
+  background: var(--g-blue-light);
+}
+
+/* Engine Badge on Output Card */
+.engine-badge {
+  background: #ffffff;
+  border: 1px solid var(--g-border);
+  padding: 0.3rem 0.65rem;
+  border-radius: 14px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--g-dark);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Billing Notice Callout */
+.billing-callout {
+  background: #fef7e0;
+  border-left: 4px solid #f9ab00;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+/* Card Match Matrix in Behind-the-Scenes */
+.matrix-container {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.matrix-card-item {
+  background: #f8f9fa;
+  border: 1px solid var(--g-border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.65rem;
+  transition: all 0.2s;
+}
+
+.matrix-card-item.selected {
+  border-color: var(--g-blue);
+  background: #e8f0fe;
+}
+
+.matrix-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.matrix-bar-wrap {
+  background: #dadce0;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 0.4rem 0;
+}
+
+.matrix-bar-fill {
+  background: var(--g-blue);
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-dialog {
+  background: #ffffff;
+  border-radius: 12px;
+  max-width: 780px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--g-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-header h3 {
+  font-family: 'Google Sans', sans-serif;
+  font-size: 1.15rem;
+  color: var(--g-dark);
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--g-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+/* Comparison Table */
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin: 1rem 0;
+}
+
+.comparison-table th, .comparison-table td {
+  border: 1px solid var(--g-border);
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+}
+
+.comparison-table th {
+  background: #f1f3f4;
+  font-weight: 600;
+  color: var(--g-dark);
+}
+
+.comparison-table td:first-child {
+  font-weight: 500;
+  color: var(--g-dark);
+}
+
 footer {
   background: #ffffff;
   border-top: 1px solid var(--g-border);
