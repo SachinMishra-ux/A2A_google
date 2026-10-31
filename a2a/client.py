@@ -1,7 +1,27 @@
 """A2A Protocol Client Implementation (HTTP / JSON-RPC 2.0).
 
-Allows any agent or orchestrator to discover remote agents via their Agent Card
-and interact with them using standard A2A JSON-RPC 2.0 operations.
+================================================================================
+WHAT DOES THE A2A CLIENT DO?
+================================================================================
+The A2AClient is the consumer-side implementation of the A2A Protocol.
+Any agent, orchestrator, or external application can instantiate this client to:
+
+1. CAPABILITY DISCOVERY:
+   Sends an HTTP GET to `/.well-known/agent-card.json`.
+   It reads the agent's name, version, and advertised skills.
+   
+2. TASK DISPATCH (message/send):
+   Wraps the prompt into a standard A2A Message and sends a JSON-RPC 2.0
+   POST request to the remote agent's `/a2a` endpoint.
+   
+3. ASYNCHRONOUS POLLING (tasks/get):
+   If the remote agent executes a long-running workflow, the client can query
+   its status and fetch artifacts once completed.
+   
+4. BOUNDARY PRESERVATION:
+   The client never knows or cares what model, prompts, or databases the remote
+   agent uses. It only exchanges messages and artifacts through standard schemas.
+================================================================================
 """
 
 from __future__ import annotations
@@ -13,40 +33,74 @@ import httpx
 
 from a2a.models import AgentCard, Artifact, Message, Part, Task
 
-class A2AClient:
-    """Client for interacting with any A2A v1.0 compliant agent server."""
 
-    def __init__(self, agent_base_url: str, rpc_path: str = "/a2a", timeout: float = 30.0):
-        """
+class A2AClient:
+    """Standardized client for interacting with any A2A v1.0 compliant agent server."""
+
+    def __init__(self, agent_base_url: str, rpc_path: Optional[str] = None, timeout: float = 30.0):
+        """Initializes the A2A client.
+        
         Args:
-            agent_base_url: Base URL of the agent namespace (e.g., http://127.0.0.1:8000/sql)
-            rpc_path: Relative RPC path (defaults to '/a2a')
+            agent_base_url: Base URL of the agent (e.g., http://127.0.0.1:8000/sql or http://127.0.0.1:8002)
+            rpc_path: Relative RPC path. If omitted, will be auto-detected:
+                      - If base_url ends with a namespace (/sql), defaults to '/a2a' -> '/sql/a2a'
+                      - If base_url is a standalone root (http://127.0.0.1:8002), defaults to '/a2a'
+            timeout: HTTP timeout in seconds (default: 30.0)
         """
         self.base_url = agent_base_url.rstrip("/")
-        self.rpc_url = f"{self.base_url}{rpc_path}"
+        if rpc_path is None:
+            self.rpc_url = f"{self.base_url}/a2a"
+        else:
+            self.rpc_url = f"{self.base_url}/{rpc_path.lstrip('/')}"
+            
         self.timeout = timeout
         self.card: Optional[AgentCard] = None
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # 1. DISCOVERY: FETCHING THE AGENT CARD
+    # ──────────────────────────────────────────────────────────────────────────
     async def get_agent_card(self) -> AgentCard:
-        """Retrieves and parses the Agent Card from /.well-known/agent-card.json."""
+        """Retrieves and parses the Agent Card from /.well-known/agent-card.json.
+        
+        This is Step 1 of the A2A lifecycle:
+        Before sending a task, the client reads the remote agent's manifest
+        to verify that the agent supports the required skills and input modes.
+        """
         card_url = f"{self.base_url}/.well-known/agent-card.json"
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.get(card_url)
             if resp.status_code != 200:
-                raise RuntimeError(f"Failed to fetch Agent Card from {card_url}: {resp.status_code} {resp.text}")
+                raise RuntimeError(
+                    f"Failed to fetch Agent Card from {card_url} (HTTP {resp.status_code}): {resp.text}"
+                )
             data = resp.json()
             self.card = AgentCard(**data)
             return self.card
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # 2. TASK EXECUTION: message/send
+    # ──────────────────────────────────────────────────────────────────────────
     async def send_message(
         self,
         text: str,
         context_id: Optional[str] = None,
         role: str = "ROLE_USER"
     ) -> Dict[str, Any]:
-        """Dispatches a task message via A2A message/send JSON-RPC 2.0.
+        """Dispatches a task message to the remote agent via A2A JSON-RPC 2.0.
         
-        Returns the parsed JSON-RPC result payload including task details and artifacts.
+        Flow:
+        1. Packs the text prompt into an A2A Part inside params.parts.
+        2. Assigns a unique messageId and optional contextId for thread continuity.
+        3. Sends JSON-RPC 2.0 POST with method = 'message/send'.
+        4. Receives back the completed Task object and structured artifacts.
+        
+        Returns:
+            Parsed dictionary containing:
+            - 'taskId': Unique ID of the executed task
+            - 'status': Final task lifecycle state ('completed', 'failed')
+            - 'output': Primary text response generated by the agent
+            - 'artifacts': List of formal deliverable objects (PDFs, scripts, datasets)
+            - 'task': Full Task object payload
         """
         payload = {
             "jsonrpc": "2.0",
@@ -63,16 +117,27 @@ class A2AClient:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             resp = await client.post(self.rpc_url, json=payload)
             if resp.status_code != 200:
-                raise RuntimeError(f"A2A Request failed ({resp.status_code}): {resp.text}")
+                raise RuntimeError(
+                    f"A2A Request to {self.rpc_url} failed with HTTP {resp.status_code}: {resp.text}"
+                )
             
             res_json = resp.json()
+            # Check for JSON-RPC level errors
             if "error" in res_json and res_json["error"]:
                 raise RuntimeError(f"A2A JSON-RPC Error: {res_json['error']}")
             
             return res_json.get("result", {})
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # 3. TASK POLLING: tasks/get
+    # ──────────────────────────────────────────────────────────────────────────
     async def get_task(self, task_id: str) -> Dict[str, Any]:
-        """Retrieves state of a task via A2A tasks/get JSON-RPC 2.0."""
+        """Queries the current status and outputs of an existing Task by ID.
+        
+        Used in asynchronous workflows:
+        When a task takes several minutes (e.g. human approval or batch training),
+        the client submits the task, stores the taskId, and polls tasks/get periodically.
+        """
         payload = {
             "jsonrpc": "2.0",
             "method": "tasks/get",
@@ -86,9 +151,13 @@ class A2AClient:
                 raise RuntimeError(f"A2A tasks/get Error: {res_json['error']}")
             return res_json.get("result", {})
 
-    # Synchronous convenience wrappers
+    # ──────────────────────────────────────────────────────────────────────────
+    # 4. SYNCHRONOUS WRAPPERS
+    # ──────────────────────────────────────────────────────────────────────────
     def get_agent_card_sync(self) -> AgentCard:
+        """Synchronous wrapper for get_agent_card."""
         return asyncio.run(self.get_agent_card())
 
     def send_message_sync(self, text: str, context_id: Optional[str] = None) -> Dict[str, Any]:
+        """Synchronous wrapper for send_message."""
         return asyncio.run(self.send_message(text, context_id))

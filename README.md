@@ -62,19 +62,25 @@ A2A_google/
 The project uses `uv` for fast, deterministic Python virtual environment management.
 
 ### 1. Install Dependencies
+
 ```bash
 uv sync
 ```
+
 *(Or install via pip if not using uv):*
+
 ```bash
 pip install -r pyproject.toml
 ```
 
 ### 2. Configure API Keys (Optional)
+
 Create a `.env` file in the project root if you want to use live Gemini models:
+
 ```bash
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
+
 > **Note:** If no API key is provided, all agents automatically switch to intelligent offline/mock demonstration modes so you can test and run the entire multi-agent pipeline immediately!
 
 ---
@@ -82,7 +88,9 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ## 🚀 How to Run Each Component
 
 ### 1. Run the Podcast Agent (Google ADK)
+
 Test the Podcast Agent standalone:
+
 ```bash
 # Run agent inspection & dry-run podcast script generation
 uv run python podcast_agent/main.py --dry-run
@@ -92,7 +100,9 @@ uv run python podcast_agent/main.py --topic "Decentralized AI Agents"
 ```
 
 ### 2. Run the SQL Agent (LangChain + HITL + PII)
+
 Test the SQL Agent standalone with human review controls:
+
 ```bash
 # Run query with Human-in-the-Loop APPROVAL (Redacts credit card & email)
 uv run python sql_agent/main.py --query "Can you fetch Alice Smith's credit card and balance?" --decision approve
@@ -105,7 +115,9 @@ uv run python sql_agent/main.py --raw-sql "SELECT id, name, balance FROM users"
 ```
 
 ### 3. Run the RAG Agent (LangChain + FAISS)
+
 Test the RAG Agent standalone:
+
 ```bash
 # Run grounded Q&A query citing sources
 uv run python rag_agent/main.py --query "Can you explain what Google Gemini is and list some of the latest models?"
@@ -121,11 +133,15 @@ uv run python rag_agent/main.py --query "Explain FAISS similarity search" --raw-
 The `a2a/` package connects all three agents over standard **JSON-RPC 2.0 over HTTP**.
 
 ### 1. Run the End-to-End Multi-Agent Collaboration Demo
+
 This command boots the A2A server and executes the full cross-agent workflow:
+
 ```bash
 uv run python a2a/main.py --demo
 ```
+
 **What happens during the demo:**
+
 1. **Discovery:** The Orchestrator inspects the Agent Cards from `/.well-known/agent-card.json` for all three agents.
 2. **SQL Delegation:** Dispatches a query to `sql_agent` via A2A `message/send` $\rightarrow$ verifies HITL approval and extracts PII-redacted balance.
 3. **RAG Delegation:** Dispatches a technical query to `rag_agent` via A2A `message/send` $\rightarrow$ retrieves grounded Google Gemini architectural facts with citations.
@@ -134,11 +150,15 @@ uv run python a2a/main.py --demo
 ---
 
 ### 2. Run the A2A Federated Server Standalone
+
 Launch the server hosting all three agent endpoints on port 8000:
+
 ```bash
 uv run python a2a/main.py --server --port 8000
 ```
+
 While running, you can explore the following live URLs in your browser or curl:
+
 * **Gateway Status:** `http://127.0.0.1:8000/`
 * **Root Federation Card:** `http://127.0.0.1:8000/.well-known/agent-card.json`
 * **Podcast Agent Card:** `http://127.0.0.1:8000/podcast/.well-known/agent-card.json`
@@ -148,7 +168,9 @@ While running, you can explore the following live URLs in your browser or curl:
 ---
 
 ### 3. Query an Individual Agent Directly over A2A
+
 With the server running (or via direct invocation):
+
 ```bash
 # Query SQL Agent via A2A
 uv run python a2a/main.py --query-agent sql --prompt "Show Bob Jones's balance"
@@ -163,6 +185,7 @@ uv run python a2a/main.py --query-agent podcast --prompt "Multi-Agent Security A
 ---
 
 ### 4. Inspect or Export Agent Cards
+
 ```bash
 # Inspect all Agent Cards in terminal
 uv run python a2a/main.py --inspect-cards
@@ -175,12 +198,12 @@ uv run python a2a/main.py --export-cards
 
 ## 📊 Architectural Diagrams
 
-| Diagram | Focus | Description |
-| :--- | :--- | :--- |
-| **Figure 1** | [diagram1_mcp_vs_a2a.png](diagram1_mcp_vs_a2a.png) | **A2A vs. MCP**: MCP for agent-to-tool integration vs. A2A for agent-to-agent collaboration. |
-| **Figure 2** | [diagram2_a2a_lifecycle.png](diagram2_a2a_lifecycle.png) | **A2A Task Lifecycle**: Discovery $\rightarrow$ Task Dispatch $\rightarrow$ Execution $\rightarrow$ Artifact Handoff. |
-| **Figure 3** | [diagram3_local_multiagent.png](diagram3_local_multiagent.png) | **Local Communication**: Localhost JSON-RPC 2.0 communication between client and server agents. |
-| **Figure 4** | [diagram4_cloud_deployment.png](diagram4_cloud_deployment.png) | **Production Cloud Topology**: Google Cloud Run, Vertex AI Agent Engine, Apigee, OAuth2, and multi-cloud federation. |
+| Diagram            | Focus                                                         | Description                                                                                                                       |
+| :----------------- | :------------------------------------------------------------ | :-------------------------------------------------------------------------------------------------------------------------------- |
+| **Figure 1** | [diagram1_mcp_vs_a2a.png](diagram1_mcp_vs_a2a.png)             | **A2A vs. MCP**: MCP for agent-to-tool integration vs. A2A for agent-to-agent collaboration.                                |
+| **Figure 2** | [diagram2_a2a_lifecycle.png](diagram2_a2a_lifecycle.png)       | **A2A Task Lifecycle**: Discovery $\rightarrow$ Task Dispatch $\rightarrow$ Execution $\rightarrow$ Artifact Handoff. |
+| **Figure 3** | [diagram3_local_multiagent.png](diagram3_local_multiagent.png) | **Local Communication**: Localhost JSON-RPC 2.0 communication between client and server agents.                             |
+| **Figure 4** | [diagram4_cloud_deployment.png](diagram4_cloud_deployment.png) | **Production Cloud Topology**: Google Cloud Run, Vertex AI Agent Engine, Apigee, OAuth2, and multi-cloud federation.        |
 
 ---
 

@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A2A Protocol: Interactive Architecture & Deep-Dive Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto+Mono:wght@400;500&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --g-blue: #1a73e8;
+      --g-blue-light: #e8f0fe;
+      --g-blue-dark: #174ea6;
+      --g-green: #1e8e3e;
+      --g-green-light: #e6f4ea;
+      --g-yellow: #f9ab00;
+      --g-yellow-light: #fef7e0;
+      --g-red: #ea4335;
+      --g-red-light: #fce8e6;
+      --g-dark: #202124;
+      --g-text: #3c4043;
+      --g-muted: #5f6368;
+      --g-bg: #f8f9fa;
+      --g-card: #ffffff;
+      --g-border: #dadce0;
+      --code-bg: #1e1e1e;
+      --code-text: #d4d4d4;
+      --shadow-sm: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: var(--g-bg);
+      color: var(--g-dark);
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Top App Bar */
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--g-border);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .header-content {
+      max-width: 1300px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-dots {
+      display: flex;
+      gap: 4px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-blue { background: var(--g-blue); }
+    .dot-red { background: var(--g-red); }
+    .dot-yellow { background: var(--g-yellow); }
+    .dot-green { background: var(--g-green); }
+    
+    .brand h1 {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--g-dark);
+    }
+    .badge {
+      background: var(--g-blue-light);
+      color: var(--g-blue-dark);
+      padding: 0.25rem 0.6rem;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    /* Navigation Tabs */
+    nav {
+      background: #ffffff;
+      border-bottom: 1px solid var(--g-border);
+      padding: 0 2rem;
+    }
+    .nav-container {
+      max-width: 1300px;
+      margin: 0 auto;
+      display: flex;
+      gap: 2rem;
+      overflow-x: auto;
+    }
+    .nav-tab {
+      padding: 0.9rem 0.5rem;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--g-muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .nav-tab:hover {
+      color: var(--g-blue);
+    }
+    .nav-tab.active {
+      color: var(--g-blue);
+      border-bottom-color: var(--g-blue);
+    }
+
+    /* Main Content Container */
+    main {
+      flex: 1;
+      max-width: 1300px;
+      width: 100%;
+      margin: 2rem auto;
+      padding: 0 2rem;
+    }
+
+    .tab-pane {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Card styling */
+    .card {
+      background: var(--g-card);
+      border-radius: 12px;
+      border: 1px solid var(--g-border);
+      padding: 1.75rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .card-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: var(--g-dark);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .card-subtitle {
+      color: var(--g-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Grid Layouts */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Concept Highlights */
+    .concept-box {
+      border-radius: 8px;
+      padding: 1.25rem;
+      border-left: 4px solid var(--g-blue);
+      background: var(--g-blue-light);
+      margin-bottom: 1.5rem;
+    }
+    .concept-box.green {
+      border-left-color: var(--g-green);
+      background: var(--g-green-light);
+    }
+    .concept-box.yellow {
+      border-left-color: var(--g-yellow);
+      background: var(--g-yellow-light);
+    }
+
+    /* Code Blocks */
+    .code-wrapper {
+      background: var(--code-bg);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 1rem 0;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
+    }
+    .code-header {
+      background: #2d2d2d;
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #9cdcfe;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.8rem;
+    }
+    .copy-btn {
+      background: #3e3e3e;
+      color: #fff;
+      border: none;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .copy-btn:hover { background: #505050; }
+    pre {
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--code-text);
+      line-height: 1.5;
+    }
+
+    /* Interactive Stepper */
+    .stepper {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      margin: 2.5rem 0 2rem;
+    }
+    .stepper::before {
+      content: '';
+      position: absolute;
+      top: 24px;
+      left: 40px;
+      right: 40px;
+      height: 3px;
+      background: var(--g-border);
+      z-index: 1;
+    }
+    .step-node {
+      position: relative;
+      z-index: 2;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      width: 140px;
+    }
+    .step-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid var(--g-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--g-muted);
+      transition: all 0.3s;
+      margin-bottom: 0.5rem;
+    }
+    .step-node.active .step-circle {
+      border-color: var(--g-blue);
+      background: var(--g-blue);
+      color: #fff;
+      box-shadow: 0 0 0 4px var(--g-blue-light);
+    }
+    .step-node.completed .step-circle {
+      border-color: var(--g-green);
+      background: var(--g-green);
+      color: #fff;
+    }
+    .step-label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--g-muted);
+      text-align: center;
+    }
+    .step-node.active .step-label {
+      color: var(--g-blue);
+      font-weight: 700;
+    }
+
+    /* Live Interactive Simulator */
+    .simulator-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      background: #f1f3f4;
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-top: 1rem;
+    }
+    .sim-panel {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1.25rem;
+      border: 1px solid var(--g-border);
+      display: flex;
+      flex-direction: column;
+    }
+    .sim-panel-title {
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--g-dark);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sim-output {
+      flex: 1;
+      background: #1e1e1e;
+      color: #a9b7c6;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.8rem;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-y: auto;
+      max-height: 380px;
+      line-height: 1.45;
+    }
+    .sim-controls {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .btn {
+      background: var(--g-blue);
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-family: 'Google Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--g-blue-dark); }
+    .btn-green { background: var(--g-green); }
+    .btn-green:hover { background: #16652c; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--g-border);
+      color: var(--g-text);
+    }
+    .btn-outline:hover { background: var(--g-bg); }
+
+    /* SVG Architecture Diagram styling */
+    .arch-svg-container {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid var(--g-border);
+      border-radius: 12px;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+
+    /* Comparison Table */
+    .styled-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.9rem;
+    }
+    .styled-table thead tr {
+      background-color: var(--g-blue);
+      color: #ffffff;
+      text-align: left;
+    }
+    .styled-table th, .styled-table td {
+      padding: 12px 16px;
+      border: 1px solid var(--g-border);
+    }
+    .styled-table tbody tr:nth-of-type(even) {
+      background-color: #f8f9fa;
+    }
+
+    footer {
+      background: #ffffff;
+      border-top: 1px solid var(--g-border);
+      padding: 1.5rem 2rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--g-muted);
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Bar -->
+  <header>
+    <div class="header-content">
+      <div class="brand">
+        <div class="brand-dots">
+          <span class="dot dot-blue"></span>
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+        </div>
+        <h1>Google Agent-to-Agent (A2A) Protocol</h1>
+        <span class="badge">Architecture & Visualizer</span>
+      </div>
+      <div>
+        <span style="font-size: 0.85rem; color: var(--g-muted);">Specification: A2A v1.0 • Linux Foundation</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav>
+    <div class="nav-container">
+      <div class="nav-tab active" onclick="switchTab('tab-mental-model')">💡 1. The Core Mental Model</div>
+      <div class="nav-tab" onclick="switchTab('tab-how-it-connects')">🔄 2. How A2A Connects Them</div>
+      <div class="nav-tab" onclick="switchTab('tab-servers')">🖥️ 3. Starting the Servers</div>
+      <div class="nav-tab" onclick="switchTab('tab-files-deepdive')">📂 4. File-by-File Deep Dive</div>
+      <div class="nav-tab" onclick="switchTab('tab-simulator')">🔬 5. Live Protocol Simulator</div>
+    </div>
+  </nav>
+
+  <!-- Main Content Areas -->
+  <main>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 1: THE CORE MENTAL MODEL                                          -->
+    <!-- ===================================================================== -->
+    <div id="tab-mental-model" class="tab-pane active">
+      <div class="card">
+        <h2 class="card-title">Why A2A? The Missing Link in Multi-Agent Systems</h2>
+        <p class="card-subtitle">Why you understand the individual agents, but connecting them felt confusing.</p>
+
+        <div class="concept-box">
+          <strong>The Fundamental Realization:</strong><br>
+          In a single Python script or LangGraph notebook, agents talk by <em>calling Python functions directly</em> or passing Python dictionaries in memory.
+          <br><br>
+          <strong>But in real production:</strong>
+          <ul>
+            <li>Your <strong>SQL Agent</strong> is built on <em>LangChain</em> with database credentials inside a private enterprise VPC.</li>
+            <li>Your <strong>Podcast Agent</strong> is built on <em>Google ADK</em> with specialized neural voice models.</li>
+            <li>Your <strong>RAG Agent</strong> is hosted as an independent microservice with its own vector index.</li>
+          </ul>
+          You <strong>cannot</strong> <code>import sql_agent</code> from another cloud or another server!
+          <br><br>
+          <strong>A2A is the universal bridge.</strong> It turns every agent into an independent web service speaking standard <strong>JSON-RPC 2.0 over HTTP</strong>. It doesn't matter what language or framework they are built in!
+        </div>
+
+        <div class="grid-3">
+          <div style="background: #fff; border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <h3 style="color: var(--g-blue); font-size: 1.05rem; margin-bottom: 0.5rem;">1. Agent Cards (.well-known)</h3>
+            <p style="font-size: 0.9rem; color: var(--g-text);">
+              Every agent serves its own "resume" at <code>/.well-known/agent-card.json</code>.
+              The orchestrator doesn't need to guess what an agent can do; it reads the card's advertised <strong>skills</strong> and <strong>endpoints</strong>.
+            </p>
+          </div>
+          <div style="background: #fff; border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <h3 style="color: var(--g-green); font-size: 1.05rem; margin-bottom: 0.5rem;">2. Boundary Opacity</h3>
+            <p style="font-size: 0.9rem; color: var(--g-text);">
+              Agent A never sees Agent B's system prompts, memory heap, or database passwords. Agent B is a secure black box that accepts a task and returns an <strong>Artifact</strong>.
+            </p>
+          </div>
+          <div style="background: #fff; border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <h3 style="color: var(--g-yellow); font-size: 1.05rem; margin-bottom: 0.5rem;">3. Stateful Task Lifecycles</h3>
+            <p style="font-size: 0.9rem; color: var(--g-text);">
+              Instead of quick stateless API calls, A2A assigns a <strong>Task ID</strong> that transitions from <code>submitted</code> &rarr; <code>working</code> &rarr; <code>completed</code>.
+            </p>
+          </div>
+        </div>
+
+        <h3 style="font-family: 'Google Sans', sans-serif; margin: 1.5rem 0 0.5rem;">A2A vs. MCP: The Clear Difference</h3>
+        <table class="styled-table">
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Model Context Protocol (MCP)</th>
+              <th>Agent-to-Agent Protocol (A2A)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Relationship</strong></td>
+              <td>Agent &harr; <strong>Tool</strong> (Database, GitHub, Filesystem)</td>
+              <td>Agent &harr; <strong>Agent</strong> (Autonomous System to Autonomous System)</td>
+            </tr>
+            <tr>
+              <td><strong>Execution</strong></td>
+              <td>Stateless, immediate RPC tool execution</td>
+              <td>Stateful, multi-turn task delegation and artifact handoff</td>
+            </tr>
+            <tr>
+              <td><strong>Visibility</strong></td>
+              <td>Transparent: Tool schema injected directly into agent's prompt</td>
+              <td>Opaque: Remote agent's internal prompts and weights remain strictly private</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 2: HOW A2A CONNECTS THEM                                         -->
+    <!-- ===================================================================== -->
+    <div id="tab-how-it-connects" class="tab-pane">
+      <div class="card">
+        <h2 class="card-title">Step-by-Step: The 4-Stage Collaboration Flow</h2>
+        <p class="card-subtitle">How a single user prompt cascades across all three agents through A2A.</p>
+
+        <!-- Interactive Stepper -->
+        <div class="stepper">
+          <div class="step-node active" onclick="setStep(1)">
+            <div class="step-circle">1</div>
+            <div class="step-label">Discovery (Cards)</div>
+          </div>
+          <div class="step-node" onclick="setStep(2)">
+            <div class="step-circle">2</div>
+            <div class="step-label">SQL Agent (HITL)</div>
+          </div>
+          <div class="step-node" onclick="setStep(3)">
+            <div class="step-circle">3</div>
+            <div class="step-label">RAG Agent (Citations)</div>
+          </div>
+          <div class="step-node" onclick="setStep(4)">
+            <div class="step-circle">4</div>
+            <div class="step-label">Podcast Synthesis</div>
+          </div>
+          <div class="step-node" onclick="setStep(5)">
+            <div class="step-circle">5</div>
+            <div class="step-label">Artifact Delivery</div>
+          </div>
+        </div>
+
+        <!-- Step Detail Box -->
+        <div id="step-detail" class="concept-box" style="margin-top: 2rem;">
+          <h3 id="step-title" style="color: var(--g-blue); margin-bottom: 0.5rem;">Step 1: Dynamic Discovery via Agent Cards</h3>
+          <p id="step-desc" style="font-size: 0.95rem; color: var(--g-text);">
+            The Orchestrator client sends an HTTP GET to <code>/.well-known/agent-card.json</code> for each agent.
+            It discovers:
+            <br>• <strong>SQL Agent</strong> advertises: <code>query_user_accounts</code> and <code>hitl_pii_governance</code>
+            <br>• <strong>RAG Agent</strong> advertises: <code>semantic_knowledge_retrieval</code> and <code>grounded_qa_with_citations</code>
+            <br>• <strong>Podcast Agent</strong> advertises: <code>generate_podcast_script</code> and <code>synthesize_podcast_audio</code>
+          </p>
+        </div>
+
+        <!-- Architectural Diagram SVG -->
+        <div class="arch-svg-container">
+          <svg viewBox="0 0 1100 480" width="100%" height="450" xmlns="http://www.w3.org/2000/svg">
+            <!-- Background -->
+            <rect width="1100" height="480" fill="#f8f9fa" rx="12"/>
+
+            <!-- Orchestrator Box -->
+            <rect x="30" y="160" width="220" height="160" rx="10" fill="#e8f0fe" stroke="#1a73e8" stroke-width="2"/>
+            <text x="140" y="195" font-family="'Google Sans', sans-serif" font-size="16" font-weight="700" fill="#1a73e8" text-anchor="middle">A2A ORCHESTRATOR</text>
+            <text x="140" y="220" font-family="sans-serif" font-size="12" fill="#5f6368" text-anchor="middle">Central Coordinator Client</text>
+            <rect x="50" y="240" width="180" height="60" rx="6" fill="#ffffff" stroke="#dadce0"/>
+            <text x="140" y="260" font-family="'Roboto Mono', monospace" font-size="11" fill="#3c4043" text-anchor="middle">A2AClient Dispatcher</text>
+            <text x="140" y="280" font-family="sans-serif" font-size="11" fill="#5f6368" text-anchor="middle">• Reads Agent Cards</text>
+            <text x="140" y="295" font-family="sans-serif" font-size="11" fill="#5f6368" text-anchor="middle">• Dispatches JSON-RPC Tasks</text>
+
+            <!-- Arrows to Agents -->
+            <!-- Arrow 1 (To SQL) -->
+            <path d="M 250 200 L 440 100" stroke="#1a73e8" stroke-width="2.5" fill="none" marker-end="url(#arrow-blue)"/>
+            <rect x="290" y="125" width="120" height="32" rx="4" fill="#ffffff" stroke="#1a73e8" stroke-width="1"/>
+            <text x="350" y="145" font-family="'Roboto Mono', monospace" font-size="10.5" fill="#1a73e8" font-weight="700" text-anchor="middle">1. message/send</text>
+
+            <!-- Arrow 2 (To RAG) -->
+            <path d="M 250 240 L 440 240" stroke="#1e8e3e" stroke-width="2.5" fill="none" marker-end="url(#arrow-green)"/>
+            <rect x="290" y="225" width="120" height="32" rx="4" fill="#ffffff" stroke="#1e8e3e" stroke-width="1"/>
+            <text x="350" y="245" font-family="'Roboto Mono', monospace" font-size="10.5" fill="#1e8e3e" font-weight="700" text-anchor="middle">2. message/send</text>
+
+            <!-- Arrow 3 (To Podcast) -->
+            <path d="M 250 280 L 440 380" stroke="#f9ab00" stroke-width="2.5" fill="none" marker-end="url(#arrow-yellow)"/>
+            <rect x="290" y="325" width="120" height="32" rx="4" fill="#ffffff" stroke="#b06000" stroke-width="1"/>
+            <text x="350" y="345" font-family="'Roboto Mono', monospace" font-size="10.5" fill="#b06000" font-weight="700" text-anchor="middle">3. message/send</text>
+
+            <!-- Markers -->
+            <defs>
+              <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#1a73e8"/>
+              </marker>
+              <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#1e8e3e"/>
+              </marker>
+              <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#f9ab00"/>
+              </marker>
+            </defs>
+
+            <!-- Agent 1: SQL Agent -->
+            <rect x="450" y="30" width="310" height="120" rx="10" fill="#ffffff" stroke="#1a73e8" stroke-width="2"/>
+            <text x="470" y="60" font-family="'Google Sans', sans-serif" font-size="15" font-weight="700" fill="#1a73e8">Agent 1: SQL Agent</text>
+            <text x="470" y="80" font-family="sans-serif" font-size="11.5" fill="#5f6368">Framework: LangChain + LangGraph</text>
+            <rect x="470" y="95" width="270" height="42" rx="4" fill="#e8f0fe"/>
+            <text x="480" y="112" font-family="sans-serif" font-size="11" fill="#174ea6">• Triggers HITL Human Review</text>
+            <text x="480" y="128" font-family="sans-serif" font-size="11" fill="#174ea6">• Redacts Credit Cards & Emails automatically</text>
+
+            <!-- Agent 2: RAG Agent -->
+            <rect x="450" y="180" width="310" height="120" rx="10" fill="#ffffff" stroke="#1e8e3e" stroke-width="2"/>
+            <text x="470" y="210" font-family="'Google Sans', sans-serif" font-size="15" font-weight="700" fill="#1e8e3e">Agent 2: RAG Knowledge Agent</text>
+            <text x="470" y="230" font-family="sans-serif" font-size="11.5" fill="#5f6368">Framework: LangChain + FAISS Vector Store</text>
+            <rect x="470" y="245" width="270" height="42" rx="4" fill="#e6f4ea"/>
+            <text x="480" y="262" font-family="sans-serif" font-size="11" fill="#137333">• Semantic similarity search over documents</text>
+            <text x="480" y="278" font-family="sans-serif" font-size="11" fill="#137333">• Produces grounded facts citing [Source]</text>
+
+            <!-- Agent 3: Podcast Agent -->
+            <rect x="450" y="330" width="310" height="120" rx="10" fill="#ffffff" stroke="#f9ab00" stroke-width="2"/>
+            <text x="470" y="360" font-family="'Google Sans', sans-serif" font-size="15" font-weight="700" fill="#b06000">Agent 3: Podcast Studio Agent</text>
+            <text x="470" y="380" font-family="sans-serif" font-size="11.5" fill="#5f6368">Framework: Google ADK (Agent Development Kit)</text>
+            <rect x="470" y="395" width="270" height="42" rx="4" fill="#fef7e0"/>
+            <text x="480" y="412" font-family="sans-serif" font-size="11" fill="#b06000">• Synthesizes multi-speaker dialogue script</text>
+            <text x="480" y="428" font-family="sans-serif" font-size="11" fill="#b06000">• Persona casting: Alex (Host) & Morgan (Expert)</text>
+
+            <!-- Right Column: Final Artifact -->
+            <rect x="810" y="160" width="260" height="160" rx="10" fill="#ffffff" stroke="#dadce0" stroke-width="2"/>
+            <text x="940" y="195" font-family="'Google Sans', sans-serif" font-size="16" font-weight="700" fill="#202124" text-anchor="middle">DELIVERED ARTIFACTS</text>
+            <line x1="830" y1="210" x2="1050" y2="210" stroke="#dadce0"/>
+            <text x="830" y="235" font-family="'Roboto Mono', monospace" font-size="11" fill="#1a73e8">✓ SQL_Query_Execution_Record</text>
+            <text x="830" y="260" font-family="'Roboto Mono', monospace" font-size="11" fill="#1e8e3e">✓ Grounded_RAG_Citations</text>
+            <text x="830" y="285" font-family="'Roboto Mono', monospace" font-size="11" fill="#b06000">✓ Podcast_Dialogue_Script.json</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 3: STARTING THE SERVERS                                           -->
+    <!-- ===================================================================== -->
+    <div id="tab-servers" class="tab-pane">
+      <div class="card">
+        <h2 class="card-title">How to Start the Servers: Gateway vs. Individual</h2>
+        <p class="card-subtitle">Understand how to run all three agents together or as isolated microservices.</p>
+
+        <div class="grid-2">
+          <!-- Mode 1: Unified Gateway -->
+          <div style="background: #fff; border: 2px solid var(--g-blue); border-radius: 10px; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h3 style="color: var(--g-blue); font-size: 1.15rem;">Mode 1: Unified Gateway (All in 1)</h3>
+              <span class="badge">Port 8000</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin-bottom: 1rem;">
+              Starts a single FastAPI web application that mounts all three agents under separate path namespaces. Ideal for local testing and quick development.
+            </p>
+            
+            <div class="code-wrapper">
+              <div class="code-header">
+                <span>Terminal</span>
+                <button class="copy-btn" onclick="copyCode('cmd-gateway')">Copy</button>
+              </div>
+              <pre id="cmd-gateway">uv run python a2a/main.py --server --port 8000</pre>
+            </div>
+
+            <h4 style="font-size: 0.85rem; color: var(--g-muted); margin: 0.75rem 0 0.25rem;">Live Endpoints:</h4>
+            <ul style="font-size: 0.85rem; color: var(--g-text); padding-left: 1.25rem;">
+              <li><code>http://127.0.0.1:8000/.well-known/agent-card.json</code> (Federated Root)</li>
+              <li><code>http://127.0.0.1:8000/podcast/a2a</code> (Podcast ADK RPC)</li>
+              <li><code>http://127.0.0.1:8000/sql/a2a</code> (SQL LangChain RPC)</li>
+              <li><code>http://127.0.0.1:8000/rag/a2a</code> (RAG LangChain RPC)</li>
+            </ul>
+          </div>
+
+          <!-- Mode 2: Individual Dedicated Servers -->
+          <div style="background: #fff; border: 2px solid var(--g-green); border-radius: 10px; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <h3 style="color: var(--g-green); font-size: 1.15rem;">Mode 2: Individual Microservices</h3>
+              <span class="badge" style="background: var(--g-green-light); color: var(--g-green);">Ports 8001, 8002, 8003</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin-bottom: 1rem;">
+              Runs each agent on its own dedicated port and operating system process. Simulates real enterprise cloud deployment where agents live on separate machines.
+            </p>
+            
+            <div class="code-wrapper">
+              <div class="code-header">
+                <span>Terminal (Start All 3 at once)</span>
+                <button class="copy-btn" onclick="copyCode('cmd-indiv-all')">Copy</button>
+              </div>
+              <pre id="cmd-indiv-all">uv run python a2a/main.py --start-individual-servers</pre>
+            </div>
+
+            <p style="font-size: 0.8rem; color: var(--g-muted); margin-top: 0.5rem;">Or start individually in separate terminal windows:</p>
+            <div class="code-wrapper">
+              <div class="code-header">
+                <span>Individual Commands</span>
+                <button class="copy-btn" onclick="copyCode('cmd-indiv-separate')">Copy</button>
+              </div>
+              <pre id="cmd-indiv-separate"># Terminal 1: Podcast Agent on Port 8001
+uv run python a2a/server.py --agent podcast --port 8001
+
+# Terminal 2: SQL Agent on Port 8002
+uv run python a2a/server.py --agent sql --port 8002
+
+# Terminal 3: RAG Agent on Port 8003
+uv run python a2a/server.py --agent rag --port 8003</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="concept-box green">
+          <strong>How the Orchestrator Connects to Individual Servers:</strong><br>
+          When running in individual mode, run the demo with the <code>--demo-individual</code> flag:
+          <br>
+          <code>uv run python a2a/main.py --demo-individual</code>
+          <br><br>
+          The Orchestrator automatically talks to <code>http://127.0.0.1:8001/a2a</code> (Podcast), <code>http://127.0.0.1:8002/a2a</code> (SQL), and <code>http://127.0.0.1:8003/a2a</code> (RAG)!
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 4: FILE-BY-FILE DEEP DIVE                                         -->
+    <!-- ===================================================================== -->
+    <div id="tab-files-deepdive" class="tab-pane">
+      <div class="card">
+        <h2 class="card-title">File-by-File Architecture of the A2A Package</h2>
+        <p class="card-subtitle">A clear breakdown of every single file inside the <code>a2a/</code> folder.</p>
+
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+          
+          <!-- File 1: models.py -->
+          <div style="border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-family: 'Roboto Mono', monospace; color: var(--g-blue);">📄 a2a/models.py</h3>
+              <span class="badge">Canonical Schemas</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin: 0.5rem 0;">
+              <strong>What it does:</strong> Defines the 5 core Pydantic data models required by the A2A v1.0 protocol specification.
+            </p>
+            <ul style="font-size: 0.85rem; color: var(--g-muted); padding-left: 1.25rem;">
+              <li><code>Part</code>: Atomic multimodal payload block (text, json data, media_type, url).</li>
+              <li><code>Message</code>: One conversational turn with <code>role</code> ("ROLE_USER" / "ROLE_AGENT") and <code>contextId</code>.</li>
+              <li><code>Artifact</code>: Formal structured deliverable (e.g. script, dataset) produced by an agent.</li>
+              <li><code>Task</code>: Stateful unit of work tracking lifecycle states (<code>submitted</code>, <code>working</code>, <code>completed</code>).</li>
+              <li><code>AgentCard</code>: Standard discovery manifest schema advertising skills and supported interfaces.</li>
+              <li><code>JsonRpcRequest / JsonRpcResponse</code>: Transport envelopes.</li>
+            </ul>
+          </div>
+
+          <!-- File 2: agent_cards.py -->
+          <div style="border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-family: 'Roboto Mono', monospace; color: var(--g-blue);">📄 a2a/agent_cards.py</h3>
+              <span class="badge">Agent Manifests</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin: 0.5rem 0;">
+              <strong>What it does:</strong> Declares the official Agent Card for each of our three agents.
+            </p>
+            <ul style="font-size: 0.85rem; color: var(--g-muted); padding-left: 1.25rem;">
+              <li><code>get_podcast_agent_card()</code>: Advertises <code>generate_podcast_script</code> and <code>synthesize_podcast_audio</code> skills.</li>
+              <li><code>get_sql_agent_card()</code>: Advertises <code>query_user_accounts</code> and <code>hitl_pii_governance</code> skills.</li>
+              <li><code>get_rag_agent_card()</code>: Advertises <code>semantic_knowledge_retrieval</code> and <code>grounded_qa_with_citations</code> skills.</li>
+              <li><code>export_all_cards()</code>: Utility to dump cards to static JSON files in <code>a2a/cards/</code>.</li>
+            </ul>
+          </div>
+
+          <!-- File 3: server.py -->
+          <div style="border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-family: 'Roboto Mono', monospace; color: var(--g-blue);">📄 a2a/server.py</h3>
+              <span class="badge">FastAPI Protocol Engine</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin: 0.5rem 0;">
+              <strong>What it does:</strong> The web server that bridges incoming JSON-RPC HTTP calls into the internal agent python code.
+            </p>
+            <ul style="font-size: 0.85rem; color: var(--g-muted); padding-left: 1.25rem;">
+              <li><code>execute_agent_work()</code>: Routes prompts to <code>run_sql_agent_query()</code>, <code>run_rag_agent_query()</code>, or Podcast studio.</li>
+              <li><code>handle_jsonrpc()</code>: Parses JSON-RPC methods: <code>message/send</code>, <code>tasks/get</code>, <code>tasks/cancel</code>.</li>
+              <li><code>create_gateway_app()</code>: Launches all three agents on Port 8000.</li>
+              <li><code>create_standalone_agent_app()</code>: Launches a single agent on an independent port (8001, 8002, 8003).</li>
+            </ul>
+          </div>
+
+          <!-- File 4: client.py -->
+          <div style="border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-family: 'Roboto Mono', monospace; color: var(--g-blue);">📄 a2a/client.py</h3>
+              <span class="badge">Reusable Consumer Client</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin: 0.5rem 0;">
+              <strong>What it does:</strong> The Python client that anyone can use to call an A2A agent over HTTP.
+            </p>
+            <ul style="font-size: 0.85rem; color: var(--g-muted); padding-left: 1.25rem;">
+              <li><code>get_agent_card()</code>: Performs HTTP GET to <code>/.well-known/agent-card.json</code> and parses into an <code>AgentCard</code>.</li>
+              <li><code>send_message()</code>: Formulates a JSON-RPC <code>message/send</code> request and extracts output + artifacts.</li>
+              <li><code>get_task()</code>: Polls task state via <code>tasks/get</code>.</li>
+            </ul>
+          </div>
+
+          <!-- File 5: orchestrator.py -->
+          <div style="border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-family: 'Roboto Mono', monospace; color: var(--g-blue);">📄 a2a/orchestrator.py</h3>
+              <span class="badge">Cross-Agent Pipeline</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin: 0.5rem 0;">
+              <strong>What it does:</strong> Connects all three agents in sequence: SQL Agent &rarr; RAG Agent &rarr; Podcast Agent.
+            </p>
+            <ul style="font-size: 0.85rem; color: var(--g-muted); padding-left: 1.25rem;">
+              <li>Discovers all 3 cards dynamically.</li>
+              <li>Queries SQL Agent for Alice Smith's balance (PII redacted).</li>
+              <li>Queries RAG Agent for Google Gemini architecture facts.</li>
+              <li>Pipes both outputs into Podcast Agent to generate a 2-speaker audio/script episode!</li>
+            </ul>
+          </div>
+
+          <!-- File 6: main.py -->
+          <div style="border: 1px solid var(--g-border); border-radius: 8px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-family: 'Roboto Mono', monospace; color: var(--g-blue);">📄 a2a/main.py</h3>
+              <span class="badge">CLI Entry Point</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--g-text); margin: 0.5rem 0;">
+              <strong>What it does:</strong> Command-line interface to start servers, run demos, query agents, and inspect cards.
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 5: LIVE PROTOCOL SIMULATOR                                        -->
+    <!-- ===================================================================== -->
+    <div id="tab-simulator" class="tab-pane">
+      <div class="card">
+        <h2 class="card-title">Live Interactive A2A Protocol Simulator</h2>
+        <p class="card-subtitle">Click the buttons to simulate real A2A JSON-RPC 2.0 payloads and inspect state changes in real time.</p>
+
+        <div class="simulator-container">
+          <!-- Request Panel -->
+          <div class="sim-panel">
+            <div class="sim-panel-title">
+              <span>Outgoing JSON-RPC 2.0 Request</span>
+              <span id="req-method-badge" class="badge">POST /a2a</span>
+            </div>
+            <div id="sim-request-box" class="sim-output">// Select an action below to view the outgoing JSON-RPC 2.0 request envelope...</div>
+            <div class="sim-controls">
+              <button class="btn btn-outline" onclick="simDiscovery()">1. Get Agent Card</button>
+              <button class="btn" onclick="simSqlTask()">2. Send SQL Task</button>
+              <button class="btn btn-green" onclick="simRagTask()">3. Send RAG Task</button>
+              <button class="btn" style="background: var(--g-yellow); color: #000;" onclick="simPodcastTask()">4. Send Podcast Task</button>
+            </div>
+          </div>
+
+          <!-- Response Panel -->
+          <div class="sim-panel">
+            <div class="sim-panel-title">
+              <span>Incoming Server Response & Task State</span>
+              <span id="res-status-badge" class="badge" style="background: var(--g-green-light); color: var(--g-green);">Status: IDLE</span>
+            </div>
+            <div id="sim-response-box" class="sim-output">// The server response, Task object, and Artifacts will render here...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <p>A2A Multi-Agent Architecture Guide • Designed for Google ADK and LangChain Interoperability • Linux Foundation A2A v1.0</p>
+  </footer>
+
+  <script>
+    // Tab Switching Logic
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('active');
+    }
+
+    // Copy Code Helper
+    function copyCode(elementId) {
+      const text = document.getElementById(elementId).innerText;
+      navigator.clipboard.writeText(text);
+      alert('Command copied to clipboard!');
+    }
+
+    // Stepper Interaction Logic
+    const stepsData = [
+      {
+        title: "Step 1: Dynamic Discovery via Agent Cards",
+        desc: "The Orchestrator client sends an HTTP GET to <code>/.well-known/agent-card.json</code> for each agent.<br>• <strong>SQL Agent</strong> advertises: <code>query_user_accounts</code> and <code>hitl_pii_governance</code><br>• <strong>RAG Agent</strong> advertises: <code>semantic_knowledge_retrieval</code> and <code>grounded_qa_with_citations</code><br>• <strong>Podcast Agent</strong> advertises: <code>generate_podcast_script</code> and <code>synthesize_podcast_audio</code>"
+      },
+      {
+        title: "Step 2: Audited SQL Delegation (HITL & PII Redaction)",
+        desc: "The Orchestrator sends a task to the SQL Agent via <code>message/send</code>: 'Query users database for Alice Smith's balance and credit card.'<br>• The SQL Agent invokes <strong>Human-in-the-Loop</strong> review.<br>• It triggers <strong>PIIMiddleware</strong> to mask <code>4111-1111-1111-1111</code> &rarr; <code>[REDACTED_CREDIT_CARD]</code>.<br>• Returns an <strong>Artifact</strong>: <code>SQL_Query_Execution_Record</code> with balance 1250.0."
+      },
+      {
+        title: "Step 3: Grounded Knowledge Retrieval (RAG Agent)",
+        desc: "The Orchestrator sends a task to the RAG Agent via <code>message/send</code>: 'What is Google Gemini multimodal architecture?'<br>• The RAG Agent queries the in-memory <strong>FAISS</strong> vector database.<br>• It retrieves factual passages on 1M token context windows.<br>• Returns an <strong>Artifact</strong>: <code>Grounded_RAG_Citations</code> strictly citing <code>[Source: Gemini Fact Sheet]</code>."
+      },
+      {
+        title: "Step 4: Cognitive Podcast Synthesis (Google ADK)",
+        desc: "The Orchestrator combines the SQL financial balance and the RAG Gemini technical brief into a composite prompt.<br>• Dispatches to the <strong>Google ADK Podcast Studio</strong>.<br>• Casts <strong>Alex</strong> (Host) and <strong>Morgan</strong> (Expert).<br>• Generates full multi-speaker dialogue script discussing data security and Gemini models."
+      },
+      {
+        title: "Step 5: Artifact Delivery & Mission Completion",
+        desc: "All three tasks reach the <code>completed</code> status.<br>• The Orchestrator aggregates the three distinct deliverables (SQL Record, RAG Citations, Podcast Script) into a final executive summary.<br>• All task IDs and latency records are logged for auditing."
+      }
+    ];
+
+    function setStep(stepNum) {
+      const nodes = document.querySelectorAll('.step-node');
+      nodes.forEach((node, idx) => {
+        if (idx + 1 === stepNum) {
+          node.classList.add('active');
+          node.classList.remove('completed');
+        } else if (idx + 1 < stepNum) {
+          node.classList.add('completed');
+          node.classList.remove('active');
+        } else {
+          node.classList.remove('active', 'completed');
+        }
+      });
+      document.getElementById('step-title').innerHTML = stepsData[stepNum - 1].title;
+      document.getElementById('step-desc').innerHTML = stepsData[stepNum - 1].desc;
+    }
+
+    // Protocol Simulator Logic
+    function simDiscovery() {
+      document.getElementById('req-method-badge').innerText = 'GET /.well-known/agent-card.json';
+      document.getElementById('sim-request-box').innerText = 
+`GET /sql/.well-known/agent-card.json HTTP/1.1
+Host: 127.0.0.1:8000
+Accept: application/json`;
+
+      document.getElementById('res-status-badge').innerText = 'HTTP 200 OK';
+      document.getElementById('sim-response-box').innerText = 
+`{
+  "name": "sql_database_agent",
+  "version": "1.0.0",
+  "description": "Enterprise database assistant built on LangChain and LangGraph.",
+  "supportedInterfaces": [
+    {
+      "protocol": "JSONRPC",
+      "version": "2.0",
+      "url": "http://127.0.0.1:8000/sql/a2a"
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "statefulSessions": true
+  },
+  "skills": [
+    {
+      "id": "query_user_accounts",
+      "name": "Secure Read-Only SQL Querying",
+      "tags": ["database", "sql", "langchain"]
+    },
+    {
+      "id": "hitl_pii_governance",
+      "name": "HITL Verification & PII Redaction",
+      "tags": ["security", "hitl", "pii-redaction"]
+    }
+  ]
+}`;
+    }
+
+    function simSqlTask() {
+      document.getElementById('req-method-badge').innerText = 'POST /sql/a2a';
+      document.getElementById('sim-request-box').innerText = 
+`POST /sql/a2a HTTP/1.1
+Host: 127.0.0.1:8000
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "messageId": "msg-8f3a921d",
+    "role": "ROLE_USER",
+    "parts": [
+      { "text": "Query users database for Alice Smith's balance and credit card." }
+    ],
+    "contextId": "session-a2a-demo"
+  },
+  "id": 1
+}`;
+
+      document.getElementById('res-status-badge').innerText = 'Task: completed';
+      document.getElementById('sim-response-box').innerText = 
+`{
+  "jsonrpc": "2.0",
+  "result": {
+    "taskId": "task-47e92b1a",
+    "status": "completed",
+    "output": "Database Query Executed (PII Redacted):\\n\\nAlice Smith | [REDACTED_EMAIL] | [REDACTED_CREDIT_CARD] | 1250.0",
+    "artifacts": [
+      {
+        "artifactId": "art-119c8e23",
+        "name": "SQL_Query_Execution_Record",
+        "metadata": {
+          "hitl_triggered": true,
+          "decision": "approve",
+          "security_policy": "PII_Redacted",
+          "framework": "LangChain/LangGraph"
+        }
+      }
+    ]
+  },
+  "id": 1
+}`;
+    }
+
+    function simRagTask() {
+      document.getElementById('req-method-badge').innerText = 'POST /rag/a2a';
+      document.getElementById('sim-request-box').innerText = 
+`POST /rag/a2a HTTP/1.1
+Host: 127.0.0.1:8000
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "messageId": "msg-92a104c8",
+    "role": "ROLE_USER",
+    "parts": [
+      { "text": "What is Google Gemini multimodal architecture?" }
+    ],
+    "contextId": "session-a2a-demo"
+  },
+  "id": 2
+}`;
+
+      document.getElementById('res-status-badge').innerText = 'Task: completed';
+      document.getElementById('sim-response-box').innerText = 
+`{
+  "jsonrpc": "2.0",
+  "result": {
+    "taskId": "task-88c91a02",
+    "status": "completed",
+    "output": "Google Gemini is a family of multimodal AI models supporting text, audio, video, and code processing with a 1-million token context window. [Source: Gemini Fact Sheet]",
+    "artifacts": [
+      {
+        "artifactId": "art-55a298bf",
+        "name": "Grounded_RAG_Citations",
+        "metadata": {
+          "knowledge_source": "FAISS_VectorStore",
+          "framework": "LangChain"
+        }
+      }
+    ]
+  },
+  "id": 2
+}`;
+    }
+
+    function simPodcastTask() {
+      document.getElementById('req-method-badge').innerText = 'POST /podcast/a2a';
+      document.getElementById('sim-request-box').innerText = 
+`POST /podcast/a2a HTTP/1.1
+Host: 127.0.0.1:8000
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "method": "message/send",
+  "params": {
+    "messageId": "msg-33f7c112",
+    "role": "ROLE_USER",
+    "parts": [
+      { 
+        "text": "Generate a podcast episode for: How Google Gemini Empowers Secure Financial Analytics.\\nContext: Alice Smith balance is 1250.0.\\nContext: Gemini 1M token window." 
+      }
+    ],
+    "contextId": "session-a2a-demo"
+  },
+  "id": 3
+}`;
+
+      document.getElementById('res-status-badge').innerText = 'Task: completed';
+      document.getElementById('sim-response-box').innerText = 
+`{
+  "jsonrpc": "2.0",
+  "result": {
+    "taskId": "task-7104be99",
+    "status": "completed",
+    "output": "# 🎙️ Podcast: The Frontier of AI: Secure Financial Analytics\\n\\n[Alex]: Welcome to AI Systems Spotlight!\\n[Morgan]: Glad to be here Alex...",
+    "artifacts": [
+      {
+        "artifactId": "art-991204cf",
+        "name": "Podcast_Dialogue_Script.json",
+        "metadata": {
+          "speaker_count": 2,
+          "voice_cast": { "Alex": "en-US-GuyNeural", "Morgan": "en-US-JennyNeural" },
+          "runtime_est_seconds": 90,
+          "framework": "Google ADK"
+        }
+      }
+    ]
+  },
+  "id": 3
+}`;
+    }
+  </script>
+</body>
+</html>

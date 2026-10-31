@@ -20,7 +20,10 @@ from sql_agent.middlewares import get_hitl_middleware, get_pii_middlewares
 
 SYSTEM_PROMPT = (
     "You are a database assistant. Your goal is to run query_sql_db to retrieve user "
-    "account details. Synthesize and report the query results. "
+    "account details. The database contains a single table: "
+    "users(id INTEGER, name TEXT, email TEXT, credit_card TEXT, balance REAL). "
+    "Always use the exact column names: id, name, email, credit_card, balance. "
+    "Synthesize and report the query results. "
     "Always respect redactions (e.g. [REDACTED_CREDIT_CARD]) in your final response."
 )
 
@@ -45,6 +48,24 @@ def create_sql_agent_instance(model_name: str = "gemini-3.1-flash-lite"):
 
 # Cached default instance
 sql_agent = create_sql_agent_instance()
+
+def _format_content_to_str(content: Any) -> str:
+    """Helper to ensure agent message content is always returned as a clean string."""
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        extracted = []
+        for item in content:
+            if isinstance(item, dict) and "text" in item:
+                extracted.append(str(item["text"]))
+            elif isinstance(item, str):
+                extracted.append(item)
+            elif hasattr(item, "text"):
+                extracted.append(str(item.text))
+            else:
+                extracted.append(str(item))
+        return "\n".join(extracted)
+    return str(content)
 
 def run_sql_agent_query(
     query_text: str,
@@ -88,7 +109,7 @@ def run_sql_agent_query(
             resume_cmd = Command(resume={"decisions": [{"type": "reject", "message": rejection_message}]})
             
         final_result = agent.invoke(resume_cmd, config=config)
-        content = final_result["messages"][-1].content
+        content = _format_content_to_str(final_result["messages"][-1].content)
         return {
             "status": "completed",
             "content": content,
@@ -97,7 +118,7 @@ def run_sql_agent_query(
             "interrupt_info": interrupt_info
         }
     else:
-        content = result["messages"][-1].content
+        content = _format_content_to_str(result["messages"][-1].content)
         return {
             "status": "completed",
             "content": content,
