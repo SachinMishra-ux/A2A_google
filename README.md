@@ -42,12 +42,21 @@ A2A_google/
 │   ├── main.py                  # Main CLI entry point for A2A operations
 │   ├── server.py                # FastAPI A2A JSON-RPC 2.0 Server & Agent Card host
 │   ├── client.py                # Reusable A2A Client (discovery, message/send, tasks/get)
+│   ├── router.py                # Intelligent Intent Routing & A2A Trace Collector
 │   ├── orchestrator.py          # End-to-end 3-agent collaboration workflow
 │   ├── models.py                # Canonical A2A v1.0 models (AgentCard, Task, Message, Artifact)
 │   ├── agent_cards.py           # Agent Card declarations for all 3 agents
 │   └── cards/                   # Exported static JSON Agent Cards
 │
+├── ui/                           # Interactive Web UI & Live A2A Inspector
+│   ├── index.html               # Google Material UI layout & split-view workspace
+│   ├── styles.css               # Google design tokens, card styles & animations
+│   ├── app.js                   # Client controller, live trace stepper & JSON-RPC viewer
+│   ├── run.py                   # One-command server and UI launcher
+│   └── README.md                # UI guide & test walkthroughs
+│
 ├── Google_A2A_Protocol_Comprehensive_Guide.docx  # Google-styled Word report
+├── A2A_Architecture_Visualization.html           # Standalone interactive architecture guide
 ├── diagram1_mcp_vs_a2a.png                       # Architectural boundary diagram
 ├── diagram2_a2a_lifecycle.png                    # 4-step task lifecycle diagram
 ├── diagram3_local_multiagent.png                 # Local communication architecture
@@ -82,6 +91,27 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 > **Note:** If no API key is provided, all agents automatically switch to intelligent offline/mock demonstration modes so you can test and run the entire multi-agent pipeline immediately!
+
+---
+
+## 🖥️ Interactive Web UI & Live Protocol Inspector
+
+You can launch and interact with all agents via a visual Google Material Design web interface:
+
+```bash
+uv run python ui/run.py
+```
+*(Or `uv run python ui/run.py --open` to automatically launch your default browser).*
+
+Open `http://127.0.0.1:8000/ui/` in your browser. From here you can:
+- **Type any query** and watch the A2A intent classifier automatically route it to the right agent (`SQL`, `RAG`, `Podcast`, or `Multi-Agent Orchestrator`).
+- **Inspect Behind the Scenes in Real Time**:
+  - Step-by-step milestone timeline.
+  - Raw **JSON-RPC 2.0 Request** payload (`tasks/send` / `tasks/create`).
+  - Raw **JSON-RPC 2.0 Response** payload with state, status, and message parts.
+  - Complete **Agent Card** schema defining capabilities, skills, and I/O contracts.
+  - Generated **Artifacts** (e.g. podcast scripts, query tables).
+- **Interactive Architecture Documentation**: View the full interactive guide at `http://127.0.0.1:8000/A2A_Architecture_Visualization.html`.
 
 ---
 

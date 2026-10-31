@@ -54,7 +54,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from a2a.models import (
     AgentCard,
@@ -71,6 +72,7 @@ from a2a.agent_cards import (
     get_sql_agent_card,
     get_rag_agent_card,
 )
+from a2a.router import route_and_execute, classify_intent
 
 # Import internal heterogeneous agents
 from sql_agent.agent import run_sql_agent_query
@@ -111,7 +113,7 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
     artifacts: List[Artifact] = []
 
     # ── CASE A: SQL AGENT (LangChain + LangGraph + HITL + PII Redaction) ──────
-    if agent_name == "sql":
+    if agent_name in ("sql", "sql_agent"):
         # Invokes the compiled LangGraph SQL agent.
         # It executes against the SQLite database, checks HITL approval,
         # and applies the PIIMiddleware to redact Credit Cards and Emails.
@@ -138,7 +140,7 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
         return content, artifacts
 
     # ── CASE B: RAG AGENT (LangChain + FAISS + Gemini Embeddings) ─────────────
-    elif agent_name == "rag":
+    elif agent_name in ("rag", "rag_agent"):
         # Invokes the LangChain RAG agent.
         # It queries the in-memory FAISS vector database for semantic similarity
         # and synthesizes a grounded answer citing authoritative sources.
@@ -160,7 +162,7 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
         return content, artifacts
 
     # ── CASE C: PODCAST AGENT (Google ADK - Agent Development Kit) ────────────
-    elif agent_name == "podcast":
+    elif agent_name in ("podcast", "podcast_agent"):
         # Invokes the Google ADK Podcast Studio pipeline.
         # It extracts topics from the incoming prompt, creates an Episode Plan,
         # and casts personas (Alex as Host, Morgan as Specialist).
@@ -358,10 +360,16 @@ def create_gateway_app() -> FastAPI:
 
     # Root Discovery Endpoints
     @app.get("/")
-    def get_root():
+    def get_root(request: Request):
+        # If requested by a web browser, redirect to the graphical UI
+        accept_header = request.headers.get("accept", "")
+        if "text/html" in accept_header and not "application/json" in accept_header:
+            return RedirectResponse(url="/ui/")
+
         return {
             "mode": "unified_gateway",
             "standard": "Agent-to-Agent (A2A) Protocol v1.0",
+            "ui_dashboard": "/ui/",
             "description": "Federated Multi-Agent Gateway hosting Podcast, SQL, and RAG agents",
             "agents": {
                 "podcast_agent": {"card": "/podcast/.well-known/agent-card.json", "rpc": "/podcast/a2a"},
@@ -369,6 +377,59 @@ def create_gateway_app() -> FastAPI:
                 "rag_agent":     {"card": "/rag/.well-known/agent-card.json",     "rpc": "/rag/a2a"},
             }
         }
+
+    # UI Router API Endpoint
+    @app.post("/api/route")
+    async def api_route_query(request: Request):
+        payload = await request.json()
+        query = payload.get("query", "").strip()
+        mode = payload.get("mode", "auto")
+        if not query:
+            raise HTTPException(status_code=400, detail="Query cannot be empty.")
+        
+        base_url = str(request.base_url).rstrip("/")
+        return await route_and_execute(query=query, mode=mode, base_url=base_url)
+
+    # API Agents List Endpoint
+    @app.get("/api/agents")
+    def api_list_agents(request: Request):
+        base_url = str(request.base_url).rstrip("/")
+        return {
+            "agents": [
+                {
+                    "id": "sql",
+                    "name": "SQL Database Agent",
+                    "framework": "LangChain + LangGraph",
+                    "icon": "🛡️",
+                    "color": "#1a73e8",
+                    "card": get_sql_agent_card(base_url).model_dump(),
+                    "endpoint": f"{base_url}/sql/a2a"
+                },
+                {
+                    "id": "rag",
+                    "name": "RAG Knowledge Agent",
+                    "framework": "LangChain + FAISS",
+                    "icon": "📚",
+                    "color": "#1e8e3e",
+                    "card": get_rag_agent_card(base_url).model_dump(),
+                    "endpoint": f"{base_url}/rag/a2a"
+                },
+                {
+                    "id": "podcast",
+                    "name": "Podcast Studio Agent",
+                    "framework": "Google ADK",
+                    "icon": "🎙️",
+                    "color": "#f9ab00",
+                    "card": get_podcast_agent_card(base_url).model_dump(),
+                    "endpoint": f"{base_url}/podcast/a2a"
+                }
+            ]
+        }
+
+    # Mount UI Static Directory
+    ui_dir = PROJECT_ROOT / "ui"
+    if ui_dir.exists():
+        app.mount("/ui", StaticFiles(directory=str(ui_dir), html=True), name="ui")
 
     @app.get("/.well-known/agent-card.json")
     def get_root_agent_card(request: Request):
@@ -414,6 +475,10 @@ def create_gateway_app() -> FastAPI:
         return await handle_jsonrpc("rag", payload)
 
     return app
+
+
+# Alias for convenience
+create_app = create_gateway_app
 
 
 def create_standalone_agent_app(agent_name: str) -> FastAPI:

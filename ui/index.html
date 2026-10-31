@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google A2A Protocol — Agent Gateway & Interactive Inspector</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-dots">
+          <span class="dot dot-blue"></span>
+          <span class="dot dot-red"></span>
+          <span class="dot dot-yellow"></span>
+          <span class="dot dot-green"></span>
+        </div>
+        <h1>Google A2A Protocol <span style="font-weight:400; color:var(--g-muted); font-size:0.95rem; margin-left:6px;">Agent Gateway & Live Inspector</span></h1>
+      </div>
+      <div class="status-pill" id="protocol-status">
+        <span class="status-dot"></span>
+        <span>A2A Protocol Ready (JSON-RPC 2.0)</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main>
+    <!-- Top Agent Cards Status Bar -->
+    <section class="agent-cards-bar">
+      <div class="agent-mini-card" id="card-sql">
+        <div class="agent-icon-circle" style="background:#e8f0fe; color:#1a73e8;">🗄️</div>
+        <div class="agent-info">
+          <h4>SQL Agent</h4>
+          <p>LangChain • LangGraph • HITL • PII</p>
+          <span style="font-size:0.72rem; color:#1a73e8; font-weight:500;">Method: query_db</span>
+        </div>
+      </div>
+
+      <div class="agent-mini-card" id="card-rag">
+        <div class="agent-icon-circle" style="background:#e6f4ea; color:#1e8e3e;">📚</div>
+        <div class="agent-info">
+          <h4>RAG Agent</h4>
+          <p>LangChain • FAISS • Grounded Citations</p>
+          <span style="font-size:0.72rem; color:#1e8e3e; font-weight:500;">Method: search_docs</span>
+        </div>
+      </div>
+
+      <div class="agent-mini-card" id="card-podcast">
+        <div class="agent-icon-circle" style="background:#fef7e0; color:#f9ab00;">🎙️</div>
+        <div class="agent-info">
+          <h4>Podcast Agent</h4>
+          <p>Google ADK • Gemini • Multi-Speaker Script</p>
+          <span style="font-size:0.72rem; color:#b06000; font-weight:500;">Method: generate_podcast</span>
+        </div>
+      </div>
+
+      <div class="agent-mini-card" id="card-orchestrator">
+        <div class="agent-icon-circle" style="background:#f3e8fd; color:#8430ce;">🌐</div>
+        <div class="agent-info">
+          <h4>A2A Orchestrator</h4>
+          <p>Supervisor • Dynamic Sub-Agent Dispatch</p>
+          <span style="font-size:0.72rem; color:#8430ce; font-weight:500;">Protocol: A2A JSON-RPC 2.0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Query Input Section -->
+    <section class="query-card">
+      <div class="query-card-header">
+        <h2>Enter Query or Mission</h2>
+        <!-- Routing Mode Selectors -->
+        <div class="mode-selector">
+          <button class="mode-btn active" data-mode="auto">✨ Auto Route (A2A Intent Classifier)</button>
+          <button class="mode-btn" data-mode="sql">🗄️ SQL Agent</button>
+          <button class="mode-btn" data-mode="rag">📚 RAG Agent</button>
+          <button class="mode-btn" data-mode="podcast">🎙️ Podcast Agent</button>
+          <button class="mode-btn" data-mode="orchestrator">🌐 Multi-Agent Orchestrator</button>
+        </div>
+      </div>
+
+      <div class="input-container">
+        <textarea id="query-input" class="query-textarea" placeholder="Type a request (e.g., query database balances, search technical docs, produce a podcast script, or execute multi-agent workflow)..." rows="2"></textarea>
+        <button id="submit-btn" class="submit-btn">
+          <span>Run A2A</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </div>
+
+      <!-- Quick Prompt Pills -->
+      <div class="prompt-pills">
+        <span class="prompt-pill" data-query="List all users with balance greater than $1000 from the database">📊 SQL: Users with balance &gt; $1000</span>
+        <span class="prompt-pill" data-query="Explain how Retrieval Augmented Generation works, including chunking, embedding, vector search, and citation grounding.">📖 RAG: How Retrieval-Augmented Generation works</span>
+        <span class="prompt-pill" data-query="Generate a punchy 3-minute podcast script discussing the architectural differences between Google ADK and LangChain for production agents.">🎙️ Podcast: ADK vs LangChain Architecture</span>
+        <span class="prompt-pill" data-query="Check the database for top users, retrieve RAG best practices for customer communication, and create a podcast episode discussing data-driven customer loyalty.">🚀 Multi-Agent: Cross-Agent Pipeline (SQL + RAG + Podcast)</span>
+      </div>
+    </section>
+
+    <!-- Split View: Left Output, Right Behind the Scenes -->
+    <div class="split-view">
+      <!-- Output Card -->
+      <section class="output-card">
+        <div class="output-header">
+          <h3>Generated Output</h3>
+          <span id="output-runtime" style="font-size:0.8rem; color:var(--g-muted);">Ready</span>
+        </div>
+
+        <!-- Dynamic Agent Badge Banner -->
+        <div id="agent-badge-banner" class="agent-badge-banner" style="display:none;">
+          <div id="agent-badge-icon" style="font-size:1.4rem;">✨</div>
+          <div>
+            <strong id="agent-badge-title" style="font-size:0.95rem;">Routed Agent</strong>
+            <p id="agent-badge-desc" style="font-size:0.8rem; color:var(--g-muted); margin:0;">A2A Protocol Dispatch</p>
+          </div>
+        </div>
+
+        <!-- Output Content Area -->
+        <div id="output-content" class="output-content">
+Welcome to the Google A2A Protocol Interactive Workspace!
+
+Enter a prompt above or click one of the quick suggestions. The A2A protocol will:
+1. Inspect the incoming request and classify intent.
+2. Locate the registered Agent Card (Agent Capabilities, Skills, Input/Output Schemas).
+3. Dispatch a standard JSON-RPC 2.0 request (`tasks/send`).
+4. Execute the agent runtime (LangChain / Google ADK / Multi-Agent Supervisor).
+5. Stream step-by-step telemetry, artifacts, and outputs in real time on the right!
+        </div>
+
+        <!-- Artifacts Section -->
+        <div id="artifacts-section" class="artifacts-section" style="display:none;">
+          <div class="artifacts-title">Generated Artifacts</div>
+          <div id="artifacts-list"></div>
+        </div>
+      </section>
+
+      <!-- Behind the Scenes Telemetry Card -->
+      <section class="telemetry-card">
+        <div class="telemetry-header">
+          <h3>Behind the Scenes (A2A Trace)</h3>
+          <span id="trace-timer" style="font-size:0.8rem; font-weight:500; color:var(--g-blue);">Latency: -- ms</span>
+        </div>
+
+        <!-- Flow Steps Progress -->
+        <div class="flow-steps" id="flow-steps-container">
+          <div class="flow-step-item" id="step-idle">
+            <div class="flow-step-icon">1</div>
+            <div class="flow-step-text">
+              <strong>Protocol Standing By</strong>
+              <p>Send a query to observe A2A routing, card resolution, and JSON-RPC execution.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sub Tabs for Telemetry Inspector -->
+        <div class="telemetry-tabs">
+          <div class="t-tab active" data-tab="json-request">JSON-RPC Request</div>
+          <div class="t-tab" data-tab="json-response">JSON-RPC Response</div>
+          <div class="t-tab" data-tab="agent-card">Agent Card</div>
+          <div class="t-tab" data-tab="trace-summary">Full Trace</div>
+        </div>
+
+        <!-- Tab Content Viewers -->
+        <pre id="code-viewer" class="code-viewer">// Telemetry will display live JSON-RPC 2.0 payloads, Agent Cards, and lifecycle events here.</pre>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div style="max-width:1400px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+      <div>Google Agent2Agent (A2A) Protocol Reference Implementation • Open Agent Communication Standard</div>
+      <div style="display:flex; gap:1.25rem;">
+        <a href="/A2A_Architecture_Visualization.html" target="_blank" style="color:var(--g-blue); text-decoration:none;">Interactive Architecture Visualizer ↗</a>
+        <a href="/api/agents" target="_blank" style="color:var(--g-blue); text-decoration:none;">Inspect Agent Cards (JSON) ↗</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
