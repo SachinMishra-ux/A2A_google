@@ -139,7 +139,7 @@ def main():
 
     prewarm_agents()
 
-    if args.multi-process:
+    if args.multi_process:
         run_multiprocess_mode(args.host, args.port)
     else:
         run_unified_mode(args.host, args.port)
