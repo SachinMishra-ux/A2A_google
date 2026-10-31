@@ -61,6 +61,7 @@ COPY podcast_agent/ /app/podcast_agent/
 COPY sql_agent/ /app/sql_agent/
 COPY rag_agent/ /app/rag_agent/
 COPY ui/ /app/ui/
+COPY entrypoint.py /app/entrypoint.py
 COPY A2A_Architecture_Visualization.html /app/
 
 # Set ownership to non-root user
@@ -75,5 +76,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://127.0.0.1:${PORT}/.well-known/agent-card.json || exit 1
 
-# Production entrypoint: runs Unified Multi-Agent Gateway or individual microservices via AGENT_MODE
-CMD ["python", "ui/run.py", "--host", "0.0.0.0", "--port", "8000"]
+# Production entrypoint: automatically pre-warms agents and launches A2A cluster
+CMD ["python", "entrypoint.py"]
