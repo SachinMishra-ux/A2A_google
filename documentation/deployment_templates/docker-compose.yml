@@ -1,0 +1,91 @@
+version: '3.8'
+
+# ==============================================================================
+# Docker Compose for Google A2A Multi-Agent Local, Staging & VM Deployment
+# Supports:
+# 1. Unified Gateway (Port 8000)
+# 2. Federated Microservices (SQL: 8001, RAG: 8002, Podcast: 8003)
+# ==============================================================================
+
+services:
+  # Option 1: Unified Multi-Agent Gateway & UI
+  a2a-gateway:
+    build:
+      context: ../../
+      dockerfile: documentation/deployment_templates/Dockerfile
+    container_name: a2a-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    env_file:
+      - ../../.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/agents"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - a2a-network
+
+  # Option 2: Standalone SQL Agent Microservice (Port 8001)
+  sql-agent:
+    build:
+      context: ../../
+      dockerfile: documentation/deployment_templates/Dockerfile
+    container_name: a2a-sql-agent
+    restart: unless-stopped
+    command: ["python", "-m", "uvicorn", "a2a.server:create_standalone_agent_app", "--factory", "--host", "0.0.0.0", "--port", "8001"]
+    ports:
+      - "8001:8001"
+    environment:
+      - AGENT_NAME=sql
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    env_file:
+      - ../../.env
+    networks:
+      - a2a-network
+
+  # Option 3: Standalone RAG Agent Microservice (Port 8002)
+  rag-agent:
+    build:
+      context: ../../
+      dockerfile: documentation/deployment_templates/Dockerfile
+    container_name: a2a-rag-agent
+    restart: unless-stopped
+    command: ["python", "-m", "uvicorn", "a2a.server:create_standalone_agent_app", "--factory", "--host", "0.0.0.0", "--port", "8002"]
+    ports:
+      - "8002:8002"
+    environment:
+      - AGENT_NAME=rag
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    env_file:
+      - ../../.env
+    networks:
+      - a2a-network
+
+  # Option 4: Standalone Podcast Agent Microservice (Port 8003)
+  podcast-agent:
+    build:
+      context: ../../
+      dockerfile: documentation/deployment_templates/Dockerfile
+    container_name: a2a-podcast-agent
+    restart: unless-stopped
+    command: ["python", "-m", "uvicorn", "a2a.server:create_standalone_agent_app", "--factory", "--host", "0.0.0.0", "--port", "8003"]
+    ports:
+      - "8003:8003"
+    environment:
+      - AGENT_NAME=podcast
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    env_file:
+      - ../../.env
+    networks:
+      - a2a-network
+
+networks:
+  a2a-network:
+    driver: bridge

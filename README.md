@@ -55,6 +55,14 @@ A2A_google/
 │   ├── run.py                   # One-command server and UI launcher
 │   └── README.md                # UI guide & test walkthroughs
 │
+├── documentation/                # Complete Documentation, Word Guides & Cloud IaC
+│   ├── Google_A2A_Cloud_Deployment_Guide.docx       # Multi-Cloud (GCP/AWS/Azure) Word Guide (1.2MB)
+│   ├── Google_A2A_Protocol_Comprehensive_Guide.docx # Complete Protocol Architecture Word Guide (933KB)
+│   ├── A2A_Architecture_Visualization.html          # Standalone Interactive HTML Visualizer
+│   ├── deployment_templates/                        # Dockerfile, Compose, K8s, Terraform (GCP/AWS/Azure)
+│   ├── diagrams/                                    # High-DPI architecture diagrams (Figures 1-7)
+│   └── README.md                                    # Documentation Hub Index
+│
 ├── Google_A2A_Protocol_Comprehensive_Guide.docx  # Google-styled Word report
 ├── A2A_Architecture_Visualization.html           # Standalone interactive architecture guide
 ├── diagram1_mcp_vs_a2a.png                       # Architectural boundary diagram

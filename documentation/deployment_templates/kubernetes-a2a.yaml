@@ -1,0 +1,134 @@
+# ==============================================================================
+# Production Kubernetes Manifest for Google A2A Multi-Agent System
+# Compatible with GKE (Google Cloud), EKS (AWS), and AKS (Azure)
+# ==============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: a2a-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: a2a-secrets
+  namespace: a2a-system
+type: Opaque
+stringData:
+  GEMINI_API_KEY: "YOUR_GEMINI_API_KEY_HERE"
+  GOOGLE_API_KEY: "YOUR_GOOGLE_API_KEY_HERE"
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Deployment: A2A Unified Gateway & Web UI
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: a2a-gateway
+  namespace: a2a-system
+  labels:
+    app.kubernetes.io/name: a2a-gateway
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: a2a-gateway
+  template:
+    metadata:
+      labels:
+        app: a2a-gateway
+    spec:
+      containers:
+      - name: gateway
+        image: gcr.io/YOUR_PROJECT_ID/a2a-system:latest
+        imagePullPolicy: IfNotPresent
+        command: ["python", "ui/run.py", "--host", "0.0.0.0", "--port", "8000"]
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - secretRef:
+            name: a2a-secrets
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+        livenessProbe:
+          httpGet:
+            path: /.well-known/agent-card.json
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /api/agents
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: a2a-gateway-service
+  namespace: a2a-system
+spec:
+  type: ClusterIP
+  selector:
+    app: a2a-gateway
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: http
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Horizontal Pod Autoscaler (HPA)
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: a2a-gateway-hpa
+  namespace: a2a-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: a2a-gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+# ──────────────────────────────────────────────────────────────────────────────
+# Ingress: Public Endpoint & SSL/TLS Termination
+# ──────────────────────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: a2a-ingress
+  namespace: a2a-system
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - a2a.yourdomain.com
+    secretName: a2a-tls-cert
+  rules:
+  - host: a2a.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: a2a-gateway-service
+            port:
+              number: 80
