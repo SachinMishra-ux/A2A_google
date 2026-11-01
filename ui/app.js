@@ -10,12 +10,15 @@ const API_BASE = window.location.origin.startsWith('http') ? '' : 'http://127.0.
 let currentMode = 'auto';
 let lastResponseData = null;
 let currentTab = 'card-matrix';
+let activeSessionId = null;
+let lastPendingConfirmation = null;
 
 // DOM Elements
 const queryInput = document.getElementById('query-input');
 const submitBtn = document.getElementById('submit-btn');
 const outputContent = document.getElementById('output-content');
 const outputRuntime = document.getElementById('output-runtime');
+const sessionBadge = document.getElementById('session-badge');
 const agentBadgeBanner = document.getElementById('agent-badge-banner');
 const agentBadgeIcon = document.getElementById('agent-badge-icon');
 const agentBadgeTitle = document.getElementById('agent-badge-title');
@@ -38,6 +41,29 @@ const telemetryTabs = document.querySelectorAll('.t-tab');
 const protocolStatus = document.getElementById('protocol-status');
 const keyDot = document.getElementById('key-dot');
 const keyStatusText = document.getElementById('key-status-text');
+
+// HITL & Tool Confirmation Elements
+const hitlBox = document.getElementById('hitl-box');
+const btnHitlApprove = document.getElementById('btn-hitl-approve');
+const btnHitlRevise = document.getElementById('btn-hitl-revise');
+const btnHitlReject = document.getElementById('btn-hitl-reject');
+const hitlFeedbackContainer = document.getElementById('hitl-feedback-container');
+const hitlCustomInput = document.getElementById('hitl-custom-input');
+const btnHitlSend = document.getElementById('btn-hitl-send');
+const revChips = document.querySelectorAll('.rev-chip');
+
+const toolConfirmBox = document.getElementById('tool-confirm-box');
+const toolNameLabel = document.getElementById('tool-name-label');
+const toolCallIdLabel = document.getElementById('tool-call-id-label');
+const toolConfirmHint = document.getElementById('tool-confirm-hint');
+const btnConfirmTool = document.getElementById('btn-confirm-tool');
+const btnRejectTool = document.getElementById('btn-reject-tool');
+
+const audioPlayerBox = document.getElementById('audio-player-box');
+const audioEpisodeTitle = document.getElementById('audio-episode-title');
+const audioMetaText = document.getElementById('audio-meta-text');
+const masterAudioElement = document.getElementById('master-audio-element');
+const audioDownloadBtn = document.getElementById('audio-download-btn');
 
 // Agent metadata dictionary
 const AGENT_META = {
@@ -115,6 +141,63 @@ function setupEventListeners() {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       handleQuerySubmit();
     }
+  });
+
+  // Human-in-the-Loop (HITL) Review Gate Buttons
+  btnHitlApprove?.addEventListener('click', () => {
+    sendFollowUpFeedback('Approve. Proceed with audio generation.', 'approve');
+  });
+
+  btnHitlRevise?.addEventListener('click', () => {
+    if (hitlFeedbackContainer) {
+      hitlFeedbackContainer.style.display = hitlFeedbackContainer.style.display === 'none' ? 'block' : 'none';
+      hitlCustomInput?.focus();
+    }
+  });
+
+  btnHitlReject?.addEventListener('click', () => {
+    if (hitlFeedbackContainer) {
+      hitlFeedbackContainer.style.display = 'block';
+      if (hitlCustomInput) {
+        hitlCustomInput.value = 'Re-research: Please investigate a different angle or topic: ';
+        hitlCustomInput.focus();
+      }
+    }
+  });
+
+  // Revision quick suggestion chips
+  revChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      if (hitlCustomInput) {
+        hitlCustomInput.value = chip.getAttribute('data-text');
+        if (hitlFeedbackContainer) hitlFeedbackContainer.style.display = 'block';
+        hitlCustomInput.focus();
+      }
+    });
+  });
+
+  // Submit custom HITL revision feedback
+  btnHitlSend?.addEventListener('click', () => {
+    const text = hitlCustomInput ? hitlCustomInput.value.trim() : '';
+    if (text) {
+      sendFollowUpFeedback(text, 'revise');
+    }
+  });
+
+  hitlCustomInput?.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      const text = hitlCustomInput.value.trim();
+      if (text) sendFollowUpFeedback(text, 'revise');
+    }
+  });
+
+  // Tool confirmation buttons
+  btnConfirmTool?.addEventListener('click', () => {
+    sendToolConfirmation(true);
+  });
+
+  btnRejectTool?.addEventListener('click', () => {
+    sendToolConfirmation(false);
   });
 
   // Modal buttons
@@ -260,6 +343,11 @@ async function handleQuerySubmit() {
     return;
   }
 
+  // Reset interactive components
+  if (hitlBox) hitlBox.style.display = 'none';
+  if (toolConfirmBox) toolConfirmBox.style.display = 'none';
+  if (audioPlayerBox) audioPlayerBox.style.display = 'none';
+
   // Set loading state
   submitBtn.disabled = true;
   submitBtn.innerHTML = `<span>Executing A2A...</span><div class="status-dot" style="animation:pulse 1s infinite;"></div>`;
@@ -293,7 +381,11 @@ async function handleQuerySubmit() {
     const response = await fetch(`${API_BASE}/api/route`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: query, mode: currentMode })
+      body: JSON.stringify({
+        query: query,
+        mode: currentMode,
+        session_id: activeSessionId
+      })
     });
 
     const elapsed = Math.round(performance.now() - startTime);
@@ -339,11 +431,135 @@ async function handleQuerySubmit() {
 }
 
 /**
+ * Sends follow-up feedback (approval, revisions, or reject) to the active session
+ */
+async function sendFollowUpFeedback(feedbackText, action = 'feedback') {
+  if (!feedbackText) return;
+
+  if (btnHitlApprove) btnHitlApprove.disabled = true;
+  if (btnHitlRevise) btnHitlRevise.disabled = true;
+  if (btnHitlReject) btnHitlReject.disabled = true;
+  if (btnHitlSend) btnHitlSend.disabled = true;
+  outputRuntime.textContent = 'Agent Processing Human Input...';
+
+  flowStepsContainer.innerHTML += `
+    <div class="flow-step-item">
+      <div class="flow-step-icon" style="background:var(--g-yellow);">⚡</div>
+      <div class="flow-step-text">
+        <strong>Human Feedback Handoff (${escapeHtml(action)})</strong>
+        <p>"${escapeHtml(feedbackText.substring(0, 80))}${feedbackText.length > 80 ? '...' : ''}"</p>
+      </div>
+    </div>
+  `;
+
+  const startTime = performance.now();
+
+  try {
+    const response = await fetch(`${API_BASE}/api/route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: feedbackText,
+        mode: currentMode === 'auto' ? 'podcast' : currentMode,
+        session_id: activeSessionId,
+        action: action
+      })
+    });
+
+    const elapsed = Math.round(performance.now() - startTime);
+    traceTimer.textContent = `Latency: ${elapsed} ms`;
+
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    lastResponseData = data;
+    renderResults(data);
+
+  } catch (err) {
+    alert(`Error sending feedback: ${err.message}`);
+  } finally {
+    if (btnHitlApprove) btnHitlApprove.disabled = false;
+    if (btnHitlRevise) btnHitlRevise.disabled = false;
+    if (btnHitlReject) btnHitlReject.disabled = false;
+    if (btnHitlSend) btnHitlSend.disabled = false;
+  }
+}
+
+/**
+ * Sends tool confirmation or rejection to Google ADK
+ */
+async function sendToolConfirmation(confirmed) {
+  if (!lastPendingConfirmation) return;
+
+  if (btnConfirmTool) btnConfirmTool.disabled = true;
+  if (btnRejectTool) btnRejectTool.disabled = true;
+  outputRuntime.textContent = confirmed ? 'Tool Execution Confirmed...' : 'Tool Call Rejected...';
+
+  flowStepsContainer.innerHTML += `
+    <div class="flow-step-item">
+      <div class="flow-step-icon" style="background:${confirmed ? 'var(--g-green)' : 'var(--g-red)'};">
+        ${confirmed ? '✓' : '✕'}
+      </div>
+      <div class="flow-step-text">
+        <strong>ADK Tool Confirmation (${confirmed ? 'Approved' : 'Rejected'})</strong>
+        <p>Tool: ${escapeHtml(lastPendingConfirmation.tool_name || 'generate_podcast_audio')}</p>
+      </div>
+    </div>
+  `;
+
+  const startTime = performance.now();
+
+  try {
+    const response = await fetch(`${API_BASE}/api/route`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: confirmed ? 'Confirm tool execution' : 'Reject tool execution',
+        mode: currentMode === 'auto' ? 'podcast' : currentMode,
+        session_id: activeSessionId,
+        action: 'tool_confirm',
+        confirmation: {
+          call_id: lastPendingConfirmation.call_id,
+          confirmed: confirmed,
+          tool_name: lastPendingConfirmation.tool_name
+        }
+      })
+    });
+
+    const elapsed = Math.round(performance.now() - startTime);
+    traceTimer.textContent = `Latency: ${elapsed} ms`;
+
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    lastResponseData = data;
+    renderResults(data);
+
+  } catch (err) {
+    alert(`Error sending tool confirmation: ${err.message}`);
+  } finally {
+    if (btnConfirmTool) btnConfirmTool.disabled = false;
+    if (btnRejectTool) btnRejectTool.disabled = false;
+  }
+}
+
+/**
  * Render output, telemetry steps, badge banner, artifacts, and tabs
  */
 function renderResults(data) {
   const agentName = data.routed_agent || 'orchestrator';
   const meta = AGENT_META[agentName] || AGENT_META['orchestrator'];
+
+  // Update Active Session ID
+  activeSessionId = data.session_id || data.task_id || data.taskId || activeSessionId;
+  if (sessionBadge && activeSessionId) {
+    sessionBadge.style.display = 'inline-flex';
+    sessionBadge.textContent = 'Session: ' + activeSessionId.substring(0, 16);
+  }
 
   // 1. Highlight Top Agent Mini Card
   document.querySelectorAll('.agent-mini-card').forEach(c => c.classList.remove('active'));
@@ -379,7 +595,45 @@ function renderResults(data) {
   outputRuntime.textContent = `State: ${data.state || 'COMPLETED'} • Duration: ${data.duration_ms} ms`;
   outputContent.innerHTML = formatOutputContent(data.output_text);
 
-  // 5. Render Artifacts if present
+  // 5. Update HITL Review Gate Panel
+  if (data.hitl_required && !data.audio_info) {
+    if (hitlBox) hitlBox.style.display = 'block';
+    if (hitlFeedbackContainer) hitlFeedbackContainer.style.display = 'none';
+  } else {
+    if (hitlBox) hitlBox.style.display = 'none';
+  }
+
+  // 6. Update Google ADK Native Tool Confirmation Gate
+  if (data.tool_confirmation_required && data.tool_confirmation_details?.call_id && !data.audio_info) {
+    if (toolConfirmBox) toolConfirmBox.style.display = 'block';
+    lastPendingConfirmation = data.tool_confirmation_details;
+    if (toolNameLabel) toolNameLabel.textContent = lastPendingConfirmation.tool_name || 'generate_podcast_audio';
+    if (toolCallIdLabel) toolCallIdLabel.textContent = lastPendingConfirmation.call_id || '';
+    if (toolConfirmHint && lastPendingConfirmation.hint) toolConfirmHint.textContent = lastPendingConfirmation.hint;
+  } else {
+    if (toolConfirmBox) toolConfirmBox.style.display = 'none';
+  }
+
+  // 7. Update Master Podcast Audio Player
+  const audioObj = data.audio_info || (data.artifacts && data.artifacts.find(a => (a.metadata && (a.metadata.type === 'audio/mp3' || a.metadata.audio_url)))?.metadata);
+  if (audioObj && (audioObj.url || audioObj.audio_url || audioObj.filename)) {
+    const audioUrl = audioObj.url || audioObj.audio_url || `/audio/${audioObj.filename}`;
+    if (audioPlayerBox) audioPlayerBox.style.display = 'block';
+    if (audioEpisodeTitle) audioEpisodeTitle.textContent = `Episode Master Track: ${audioObj.filename || 'podcast_episode.mp3'}`;
+    if (audioMetaText) audioMetaText.textContent = `File Size: ${audioObj.size_kb || 0} KB • Neural Multi-Speaker MP3 • Google ADK Pipeline`;
+    if (masterAudioElement) {
+      masterAudioElement.src = audioUrl;
+      masterAudioElement.load();
+    }
+    if (audioDownloadBtn) {
+      audioDownloadBtn.href = audioUrl;
+      audioDownloadBtn.setAttribute('download', audioObj.filename || 'podcast_episode.mp3');
+    }
+  } else {
+    if (audioPlayerBox) audioPlayerBox.style.display = 'none';
+  }
+
+  // 8. Render Artifacts if present
   if (data.artifacts && data.artifacts.length > 0) {
     artifactsSection.style.display = 'block';
     artifactsList.innerHTML = '';
@@ -388,9 +642,9 @@ function renderResults(data) {
       pill.className = 'artifact-pill';
       pill.innerHTML = `
         <div style="display:flex; align-items:center; gap:8px;">
-          <span>📦</span>
+          <span>${art.metadata?.type === 'audio/mp3' ? '🎧' : '📦'}</span>
           <strong>${escapeHtml(art.name || 'Artifact')}</strong>
-          <span style="color:var(--g-muted); font-size:0.75rem;">(${escapeHtml(art.type || 'text/plain')})</span>
+          <span style="color:var(--g-muted); font-size:0.75rem;">(${escapeHtml(art.type || 'Deliverable')})</span>
         </div>
         <span style="font-size:0.75rem; color:var(--g-blue); cursor:pointer;" onclick="viewArtifactContent('${encodeURIComponent(JSON.stringify(art))}')">Inspect ↗</span>
       `;
@@ -400,20 +654,72 @@ function renderResults(data) {
     artifactsSection.style.display = 'none';
   }
 
-  // 6. Render Behind-the-Scenes Steps
+  // 9. Render Behind-the-Scenes Steps
   renderSteps(data.steps || []);
 
-  // 7. Render Card Match Matrix
+  // 10. Render Card Match Matrix
   renderMatrix(data.card_evaluations || []);
 
-  // 8. Render Active Code Viewer Tab
+  // 11. Render Active Code Viewer Tab
   renderActiveTab();
+}
+
+/**
+ * Format output text nicely
+ */
+function formatOutputContent(text) {
+  if (!text) return '<span style="color:var(--g-muted);">(No text output returned)</span>';
+
+  // If raw string representation of Event list is detected, extract clean text
+  if (text.startsWith('[Event(') || text.includes('Event(model_version=')) {
+    const textMatches = [...text.matchAll(/text=['"](.*?)['"]/g)];
+    if (textMatches.length > 0) {
+      text = textMatches.map(m => m[1].replace(/\\n/g, '\n')).join('\n\n');
+    }
+  }
+
+  let escaped = escapeHtml(text);
+
+  // Format Agent Section Dividers
+  escaped = escaped.replace(/---/g, '<hr style="border:0; border-top:1px solid var(--g-border); margin:1.25rem 0;">');
+
+  // Format Agent Headers
+  escaped = escaped.replace(/(🎙️\s*&lt;strong&gt;Podcast Producer.*?&lt;\/strong&gt;|🔍\s*&lt;strong&gt;Research Agent.*?&lt;\/strong&gt;|✍️\s*&lt;strong&gt;Scriptwriter Agent.*?&lt;\/strong&gt;|🎧\s*&lt;strong&gt;Audio Producer Agent.*?&lt;\/strong&gt;)/g, '<div style="background:#f8f9fa; border-left:3px solid var(--g-blue); padding:6px 10px; border-radius:4px; margin:12px 0 8px; font-size:0.92rem;">$1</div>');
+
+  // Format Bold & Italic markdown
+  escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  escaped = escaped.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  // Format Headers
+  escaped = escaped.replace(/^### (.*?)$/gm, '<h3 style="font-size:1.1rem; color:var(--g-dark); margin:0.8rem 0 0.4rem;">$1</h3>');
+  escaped = escaped.replace(/^## (.*?)$/gm, '<h2 style="font-size:1.25rem; color:var(--g-dark); margin:1rem 0 0.5rem;">$1</h2>');
+  escaped = escaped.replace(/^# (.*?)$/gm, '<h1 style="font-size:1.4rem; color:var(--g-dark); margin:1rem 0 0.6rem;">$1</h1>');
+
+  // Format Bullet points
+  escaped = escaped.replace(/^[•\*]\s+(.*?)$/gm, '<li style="margin-left:1.2rem;">$1</li>');
+
+  // Format Speaker dialogue turns (Alex, Morgan, Taylor)
+  escaped = escaped.replace(/&lt;strong&gt;Alex:&lt;\/strong&gt;/g, '<span style="display:inline-block; font-weight:700; color:#1a73e8; background:#e8f0fe; padding:2px 8px; border-radius:6px; margin-right:6px;">Alex (Host)</span>');
+  escaped = escaped.replace(/&lt;strong&gt;Alex&lt;\/strong&gt;:/g, '<span style="display:inline-block; font-weight:700; color:#1a73e8; background:#e8f0fe; padding:2px 8px; border-radius:6px; margin-right:6px;">Alex (Host)</span>');
+
+  escaped = escaped.replace(/&lt;strong&gt;Morgan:&lt;\/strong&gt;/g, '<span style="display:inline-block; font-weight:700; color:#1e8e3e; background:#e6f4ea; padding:2px 8px; border-radius:6px; margin-right:6px;">Morgan (Expert)</span>');
+  escaped = escaped.replace(/&lt;strong&gt;Morgan&lt;\/strong&gt;:/g, '<span style="display:inline-block; font-weight:700; color:#1e8e3e; background:#e6f4ea; padding:2px 8px; border-radius:6px; margin-right:6px;">Morgan (Expert)</span>');
+
+  escaped = escaped.replace(/&lt;strong&gt;Taylor:&lt;\/strong&gt;/g, '<span style="display:inline-block; font-weight:700; color:#8430ce; background:#f3e8fd; padding:2px 8px; border-radius:6px; margin-right:6px;">Taylor (Skeptic)</span>');
+  escaped = escaped.replace(/&lt;strong&gt;Taylor&lt;\/strong&gt;:/g, '<span style="display:inline-block; font-weight:700; color:#8430ce; background:#f3e8fd; padding:2px 8px; border-radius:6px; margin-right:6px;">Taylor (Skeptic)</span>');
+
+  // Line breaks
+  escaped = escaped.replace(/\n\n/g, '<br><br>');
+  escaped = escaped.replace(/\n/g, '<br>');
+
+  return `<div style="line-height:1.65; font-size:0.92rem;">${escaped}</div>`;
 }
 
 /**
  * Render Card Match Matrix in Behind-the-Scenes
  */
 function renderMatrix(candidates) {
+  if (!matrixCardsList) return;
   if (!candidates || candidates.length === 0) {
     matrixCardsList.innerHTML = '<div style="color:var(--g-muted); font-size:0.8rem;">No card evaluations logged.</div>';
     return;
@@ -426,7 +732,7 @@ function renderMatrix(candidates) {
       <div class="matrix-card-item ${isSelected ? 'selected' : ''}">
         <div class="matrix-card-header">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span>${c.icon}</span>
+            <span>${c.icon || '🏷️'}</span>
             <strong style="font-size:0.85rem; color:var(--g-dark);">${escapeHtml(c.name)}</strong>
           </div>
           <span style="font-size:0.75rem; font-weight:600; color:${isSelected ? 'var(--g-blue)' : 'var(--g-muted)'};">
@@ -444,14 +750,6 @@ function renderMatrix(candidates) {
   });
 
   matrixCardsList.innerHTML = html;
-}
-
-/**
- * Format output text nicely
- */
-function formatOutputContent(text) {
-  if (!text) return '<span style="color:var(--g-muted);">(No text output returned)</span>';
-  return escapeHtml(text);
 }
 
 /**

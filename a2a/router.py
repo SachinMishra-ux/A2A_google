@@ -100,7 +100,21 @@ def evaluate_agent_cards(query: str) -> Dict[str, Any]:
     has_sql = len(sql_matches) > 0
     has_rag = len(rag_matches) > 0
     has_pod = len(pod_matches) > 0
-    is_composite = (has_sql and has_pod) or (has_rag and has_pod) or (has_sql and has_rag and "both" in q_lower) or any(w in q_lower for w in ["orchestrat", "collaborat", "all agents", "pipeline"])
+
+    # Explicit podcast intent: requests that specifically ask to write/generate a podcast script or episode
+    is_podcast_request = (
+        ("podcast" in q_lower and ("script" in q_lower or "episode" in q_lower or "generate" in q_lower or "create" in q_lower))
+        or q_lower.startswith("podcast:")
+        or ("alex" in q_lower and "morgan" in q_lower)
+    )
+
+    # Composite mission requires combining SQL with Podcast, or explicit orchestration keywords
+    is_composite = (
+        (has_sql and has_pod)
+        or (has_sql and has_rag and "both" in q_lower)
+        or any(w in q_lower for w in ["orchestrat", "collaborat", "all agents", "pipeline", "cross-agent"])
+    ) and not (is_podcast_request and not has_sql and not any(w in q_lower for w in ["orchestrat", "pipeline"]))
+
     orch_score = 98 if is_composite else (max(sql_score, rag_score, pod_score) - 30 if is_composite else 15)
     orch_eval = {
         "agent_id": "orchestrator",
@@ -155,7 +169,10 @@ def classify_intent(query: str) -> Dict[str, Any]:
 async def route_and_execute(
     query: str,
     mode: str = "auto",
-    base_url: str = "http://127.0.0.1:8000"
+    base_url: str = "http://127.0.0.1:8000",
+    context_id: Optional[str] = None,
+    action: Optional[str] = None,
+    confirmation: Optional[dict] = None
 ) -> Dict[str, Any]:
     """Routes query, executes A2A call, and builds comprehensive behind-the-scenes telemetry.
     
@@ -163,6 +180,9 @@ async def route_and_execute(
         query: The natural-language query from the user.
         mode: Routing mode ('auto', 'sql', 'rag', 'podcast', 'orchestrator').
         base_url: The A2A Gateway server URL.
+        context_id: Stateful session context identifier.
+        action: Optional HITL action trigger ('approve', 'revise', 'tool_confirm').
+        confirmation: Optional tool confirmation payload.
     """
     # Lazy import to avoid circular dependencies with server.py
     from a2a.server import handle_jsonrpc
@@ -210,13 +230,14 @@ async def route_and_execute(
     # ──────────────────────────────────────────────────────────────────────────
     if target_agent == "orchestrator":
         steps.append("Capability Discovery: Resolved Agent Cards for SQL, RAG, and Podcast agents.")
+        orch_session = context_id or f"orch-{uuid.uuid4().hex[:8]}"
         
         # 1. SQL Step
         steps.append("A2A Delegation (1/3): Invoking SQL Agent via JSON-RPC 2.0 'message/send'...")
         sql_req = {
             "jsonrpc": "2.0",
             "method": "message/send",
-            "params": {"parts": [{"text": "Query database for top user records and balances."}], "contextId": "orch-sql"},
+            "params": {"parts": [{"text": "Query database for top user records and balances."}], "contextId": f"{orch_session}-sql"},
             "id": 101
         }
         sql_res = await handle_jsonrpc("sql", sql_req)
@@ -228,7 +249,7 @@ async def route_and_execute(
         rag_req = {
             "jsonrpc": "2.0",
             "method": "message/send",
-            "params": {"parts": [{"text": "Explain best practices for customer communication and analytics."}], "contextId": "orch-rag"},
+            "params": {"parts": [{"text": "Explain best practices for customer communication and analytics."}], "contextId": f"{orch_session}-rag"},
             "id": 102
         }
         rag_res = await handle_jsonrpc("rag", rag_req)
@@ -237,20 +258,26 @@ async def route_and_execute(
 
         # 3. Podcast Step
         steps.append("A2A Delegation (3/3): Passing composite outputs to Google ADK Podcast Agent...")
+        podcast_topic = query.strip() or "Enterprise Data and AI Systems"
         podcast_prompt = (
-            f"Generate a podcast episode for: Enterprise Data and AI Systems.\n\n"
+            f"Generate a podcast episode for: {podcast_topic}\n\n"
             f"Database Context:\n{sql_out}\n\n"
             f"Knowledge Retrieval Context:\n{rag_out}"
         )
         pod_req = {
             "jsonrpc": "2.0",
             "method": "message/send",
-            "params": {"parts": [{"text": podcast_prompt}], "contextId": "orch-pod"},
+            "params": {
+                "parts": [{"text": podcast_prompt}],
+                "contextId": orch_session,
+                "confirmation": confirmation
+            },
             "id": 103
         }
         pod_res = await handle_jsonrpc("podcast", pod_req)
-        final_output = pod_res.get("result", {}).get("output", "")
-        pod_arts = pod_res.get("result", {}).get("artifacts", [])
+        pod_result = pod_res.get("result", {})
+        final_output = pod_result.get("output", "")
+        pod_arts = pod_result.get("artifacts", [])
 
         all_artifacts = sql_arts + rag_arts + pod_arts
         steps.append(f"Artifact Aggregation: Collected {len(all_artifacts)} cross-agent artifacts.")
@@ -272,12 +299,18 @@ async def route_and_execute(
             "output_text": final_output,
             "output": final_output,
             "artifacts": all_artifacts,
-            "task_id": f"task-orch-{uuid.uuid4().hex[:8]}",
-            "taskId": f"task-orch-{uuid.uuid4().hex[:8]}",
+            "task_id": orch_session,
+            "taskId": orch_session,
+            "session_id": orch_session,
+            "hitl_required": pod_result.get("hitl_required", False),
+            "hitl_info": pod_result.get("hitl_info", ""),
+            "tool_confirmation_required": pod_result.get("tool_confirmation_required", False),
+            "tool_confirmation_details": pod_result.get("tool_confirmation_details", {}),
+            "audio_info": pod_result.get("audio_info"),
             "duration_ms": duration_ms,
             "duration_seconds": round(duration_ms / 1000, 2),
-            "state": "COMPLETED",
-            "status": "completed",
+            "state": pod_result.get("status", "COMPLETED").upper(),
+            "status": pod_result.get("status", "completed"),
             "llm_called": True,
             "execution_mode": "multi_agent_pipeline",
             "model": "Multi-Framework (LangChain + Google ADK)",
@@ -303,6 +336,8 @@ async def route_and_execute(
     skills_list = [s.get("name") if isinstance(s, dict) else getattr(s, "name", str(s)) for s in card_dict.get("skills", [])]
     steps.append(f"Agent Card Discovery: Resolved Agent Card for '{card_dict.get('name')}' (Version: {card_dict.get('version')}, Skills: {', '.join(skills_list)}).")
 
+    session_id = context_id or f"session-{agent_key}-{int(time.time())}"
+
     # Construct standard A2A JSON-RPC 2.0 Request
     rpc_request = {
         "jsonrpc": "2.0",
@@ -311,12 +346,13 @@ async def route_and_execute(
             "messageId": f"msg-{int(time.time()*1000)}",
             "role": "ROLE_USER",
             "parts": [{"text": query}],
-            "contextId": f"ui-session-{int(time.time())}"
+            "contextId": session_id,
+            "confirmation": confirmation
         },
         "id": 1
     }
 
-    steps.append(f"A2A Task Dispatch: Created JSON-RPC 2.0 'message/send' request (Context: {rpc_request['params']['contextId']}).")
+    steps.append(f"A2A Task Dispatch: Created JSON-RPC 2.0 'message/send' request (Context: {session_id}).")
 
     # Execute in-process via handle_jsonrpc
     rpc_response = await handle_jsonrpc(target_agent, rpc_request)
@@ -341,7 +377,7 @@ async def route_and_execute(
                 preview_text += p
         formatted_artifacts.append({
             "name": art_name,
-            "type": art.get("metadata", {}).get("framework", "Deliverable"),
+            "type": art.get("metadata", {}).get("framework", art.get("metadata", {}).get("type", "Deliverable")),
             "metadata": art.get("metadata", {}),
             "preview": preview_text[:300] + ("..." if len(preview_text) > 300 else "")
         })
@@ -370,6 +406,12 @@ async def route_and_execute(
         "artifacts": formatted_artifacts,
         "task_id": task_id,
         "taskId": task_id,
+        "session_id": result_data.get("session_id", session_id),
+        "hitl_required": result_data.get("hitl_required", False),
+        "hitl_info": result_data.get("hitl_info", ""),
+        "tool_confirmation_required": result_data.get("tool_confirmation_required", False),
+        "tool_confirmation_details": result_data.get("tool_confirmation_details", {}),
+        "audio_info": result_data.get("audio_info"),
         "duration_ms": duration_ms,
         "duration_seconds": round(duration_ms / 1000, 2),
         "state": status.upper(),

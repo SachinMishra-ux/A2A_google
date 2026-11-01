@@ -661,3 +661,266 @@ footer {
   color: var(--g-muted);
   margin-top: auto;
 }
+
+/* Session Badge */
+.session-badge {
+  font-size: 0.75rem;
+  background: var(--g-blue-light);
+  color: var(--g-blue-dark);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Human-in-the-Loop (HITL) Interactive Decision Panel
+ * ────────────────────────────────────────────────────────────────────────── */
+.hitl-panel {
+  background: #ffffff;
+  border: 2px solid var(--g-yellow);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+  box-shadow: 0 4px 12px rgba(249, 171, 0, 0.15);
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hitl-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.hitl-pulse-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--g-yellow);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+.hitl-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--g-yellow-light);
+  color: #b06000;
+  padding: 3px 8px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hitl-desc {
+  font-size: 0.86rem;
+  color: var(--g-text);
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.hitl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.hitl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.btn-approve {
+  background: var(--g-green);
+  color: #ffffff;
+  border-color: #188038;
+}
+
+.btn-approve:hover {
+  background: #188038;
+  box-shadow: 0 2px 6px rgba(30, 142, 62, 0.3);
+}
+
+.btn-revise {
+  background: #ffffff;
+  color: var(--g-blue);
+  border-color: var(--g-border);
+}
+
+.btn-revise:hover {
+  background: var(--g-blue-light);
+  border-color: var(--g-blue);
+}
+
+.btn-reject {
+  background: #ffffff;
+  color: var(--g-muted);
+  border-color: var(--g-border);
+}
+
+.btn-reject:hover {
+  background: var(--g-red-light);
+  color: var(--g-red);
+  border-color: var(--g-red);
+}
+
+.hitl-feedback-wrap {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--g-border);
+}
+
+.revision-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.rev-chip {
+  font-size: 0.76rem;
+  background: #f1f3f4;
+  color: var(--g-dark);
+  padding: 4px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  border: 1px solid var(--g-border);
+  transition: all 0.15s ease;
+}
+
+.rev-chip:hover {
+  background: var(--g-blue-light);
+  color: var(--g-blue-dark);
+  border-color: var(--g-blue);
+}
+
+.hitl-textarea {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--g-border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.hitl-textarea:focus {
+  outline: none;
+  border-color: var(--g-blue);
+}
+
+.hitl-submit-btn {
+  background: var(--g-blue);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 0 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.hitl-submit-btn:hover {
+  background: var(--g-blue-dark);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Google ADK Native Tool Confirmation Card
+ * ────────────────────────────────────────────────────────────────────────── */
+.tool-confirm-panel {
+  background: #fffdf5;
+  border: 1.5px solid var(--g-yellow);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+}
+
+.tool-confirm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tool-confirm-badge {
+  font-size: 0.72rem;
+  background: var(--g-yellow-light);
+  color: #b06000;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.tool-meta-box {
+  background: #ffffff;
+  border: 1px solid var(--g-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Master Podcast Audio Player Panel
+ * ────────────────────────────────────────────────────────────────────────── */
+.audio-player-panel {
+  background: #ffffff;
+  border: 1.5px solid var(--g-green);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-top: 1rem;
+  box-shadow: 0 4px 12px rgba(30, 142, 62, 0.12);
+}
+
+.audio-player-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.master-audio-element {
+  width: 100%;
+  height: 42px;
+  outline: none;
+  border-radius: 20px;
+}
+
+.audio-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--g-green-light);
+  color: var(--g-green);
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.audio-download-btn:hover {
+  background: var(--g-green);
+  color: #ffffff;
+}

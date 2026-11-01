@@ -62,7 +62,6 @@ COPY sql_agent/ /app/sql_agent/
 COPY rag_agent/ /app/rag_agent/
 COPY ui/ /app/ui/
 COPY entrypoint.py /app/entrypoint.py
-COPY A2A_Architecture_Visualization.html /app/
 
 # Set ownership to non-root user
 RUN chown -R a2a:a2a /app

@@ -78,10 +78,113 @@ from a2a.router import route_and_execute, classify_intent
 from sql_agent.agent import run_sql_agent_query
 from rag_agent.agent import run_rag_agent_query
 from podcast_agent.schemas import DialogueTurn, PodcastPlan, PodcastScript, SpeakerProfile
+from google.genai import types
+from google.adk.utils._function_call_names import REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
 
 # In-Memory Stateful Task Store (Task ID -> Task object)
 # In production, this can be backed by Redis or PostgreSQL for distributed state.
 TASK_STORE: Dict[str, Task] = {}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# GLOBAL STATEFUL RUNNER & SESSION STORE FOR GOOGLE ADK PODCAST STUDIO
+# ──────────────────────────────────────────────────────────────────────────────
+PODCAST_RUNNER = None
+PODCAST_SESSIONS: Dict[str, Dict[str, Any]] = {}
+
+def get_podcast_runner():
+    """Returns the persistent Google ADK InMemoryRunner singleton."""
+    global PODCAST_RUNNER
+    if PODCAST_RUNNER is None:
+        from google.adk.runners import InMemoryRunner
+        from podcast_agent.agent import root_agent
+        PODCAST_RUNNER = InMemoryRunner(agent=root_agent)
+    return PODCAST_RUNNER
+
+def format_adk_events(events: list, session_id: str = "") -> Tuple[str, dict]:
+    """Formats list of ADK Event objects into clean, professional markdown and extracts metadata."""
+    agent_badge_map = {
+        "podcast_agent": "🎙️ **Podcast Producer (Coordinator)**",
+        "research_agent": "🔍 **Research Agent**",
+        "scriptwriter_agent": "✍️ **Scriptwriter Agent**",
+        "audio_producer_agent": "🎧 **Audio Producer Agent**",
+    }
+    
+    formatted_sections = []
+    hitl_required = False
+    hitl_prompt = ""
+    script_content = ""
+    tool_confirmation_required = False
+    confirmation_info = {}
+    audio_file_info = None
+
+    for ev in events:
+        author = ev.author or "Agent"
+        author_header = agent_badge_map.get(author, f"🤖 **{author}**")
+        
+        # Check tool confirmation requests
+        if hasattr(ev, "get_function_calls"):
+            for fc in ev.get_function_calls():
+                if fc.name == REQUEST_CONFIRMATION_FUNCTION_CALL_NAME:
+                    tool_confirmation_required = True
+                    args = fc.args or {}
+                    orig_fc = args.get("originalFunctionCall", {})
+                    confirmation_info = {
+                        "call_id": fc.id,
+                        "tool_name": orig_fc.get("name", "generate_podcast_audio"),
+                        "args": orig_fc.get("args", {}),
+                        "hint": args.get("toolConfirmation", {}).get("hint", "Please approve or reject this tool invocation.")
+                    }
+        
+        # Check text parts
+        if ev.content and ev.content.parts:
+            text_parts = []
+            for p in ev.content.parts:
+                if getattr(p, "thought", False):
+                    continue
+                if getattr(p, "text", None):
+                    text_parts.append(p.text.strip())
+            
+            if text_parts:
+                section_text = "\n\n".join(text_parts)
+                
+                # Check for Human-in-the-Loop review gate
+                if any(k in section_text for k in ["• **APPROVE**", "• APPROVE", "draft script for your review", "RE-RESEARCH / REJECT"]):
+                    hitl_required = True
+                    hitl_prompt = section_text
+                
+                # Extract script content
+                if any(k in section_text for k in ["**Episode Title:", "### Episode Title:", "Dialogue Transcript:"]):
+                    script_content = section_text
+                    
+                formatted_sections.append(f"{author_header}\n\n{section_text}")
+
+    full_output = "\n\n---\n\n".join(formatted_sections) if formatted_sections else "Agent completed task."
+    
+    # Check for newly generated or latest audio files in podcast_agent/output
+    out_dir = PROJECT_ROOT / "podcast_agent" / "output"
+    if out_dir.exists():
+        mp3_files = [f for f in out_dir.glob("*.mp3") if f.is_file()]
+        if mp3_files:
+            mp3_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+            latest_mp3 = mp3_files[0]
+            # If created or modified within last 10 minutes
+            if time.time() - latest_mp3.stat().st_mtime < 600:
+                audio_file_info = {
+                    "filename": latest_mp3.name,
+                    "url": f"/audio/{latest_mp3.name}",
+                    "size_kb": round(latest_mp3.stat().st_size / 1024, 1),
+                    "modified": latest_mp3.stat().st_mtime
+                }
+
+    return full_output, {
+        "hitl_required": hitl_required,
+        "hitl_prompt": hitl_prompt,
+        "script_content": script_content,
+        "tool_confirmation_required": tool_confirmation_required,
+        "confirmation_info": confirmation_info,
+        "audio_file_info": audio_file_info,
+        "session_id": session_id,
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -101,7 +204,7 @@ def extract_text_content(content: Any) -> str:
         return "\n".join(parts)
     return str(content)
 
-def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[str]) -> Tuple[str, List[Artifact]]:
+def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[str], confirmation_data: Optional[dict] = None) -> Tuple[str, List[Artifact], Dict[str, Any]]:
     """Invokes the target internal agent framework and packages output as A2A Artifacts.
     
     This function is the heart of the A2A adapter layer:
@@ -111,12 +214,10 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
       never the agent's internal memory state, model weights, or system prompts.
     """
     artifacts: List[Artifact] = []
+    extra_meta: Dict[str, Any] = {}
 
     # ── CASE A: SQL AGENT (LangChain + LangGraph + HITL + PII Redaction) ──────
     if agent_name in ("sql", "sql_agent"):
-        # Invokes the compiled LangGraph SQL agent.
-        # It executes against the SQLite database, checks HITL approval,
-        # and applies the PIIMiddleware to redact Credit Cards and Emails.
         sql_res = run_sql_agent_query(
             query_text=query_text,
             thread_id=context_id or "a2a_session",
@@ -124,7 +225,6 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
         )
         content = extract_text_content(sql_res.get("content", ""))
         
-        # Package deliverable as an A2A Artifact
         artifacts.append(
             Artifact(
                 name="SQL_Query_Execution_Record",
@@ -141,17 +241,13 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
                 }
             )
         )
-        return content, artifacts
+        return content, artifacts, extra_meta
 
     # ── CASE B: RAG AGENT (LangChain + FAISS + Gemini Embeddings) ─────────────
     elif agent_name in ("rag", "rag_agent"):
-        # Invokes the LangChain RAG agent.
-        # It queries the in-memory FAISS vector database for semantic similarity
-        # and synthesizes a grounded answer citing authoritative sources.
         rag_res = run_rag_agent_query(query_text)
         content = extract_text_content(rag_res.get("content", ""))
         
-        # Package deliverable as an A2A Artifact
         artifacts.append(
             Artifact(
                 name="Grounded_RAG_Citations",
@@ -167,34 +263,90 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
                 }
             )
         )
-        return content, artifacts
+        return content, artifacts, extra_meta
 
     # ── CASE C: PODCAST AGENT (Google ADK - Agent Development Kit) ────────────
     elif agent_name in ("podcast", "podcast_agent"):
-        # Invokes the real Google ADK Podcast Studio pipeline.
-        # It initializes the InMemoryRunner with root_agent, attempting live Gemini execution.
-        clean_topic = query_text.replace("Generate a podcast episode for:", "").strip()
-        from google.adk.runners import InMemoryRunner
-        from podcast_agent.agent import root_agent
-
-        runner = InMemoryRunner(agent=root_agent)
+        session_id = context_id or f"pod-session-{int(time.time())}"
+        runner = get_podcast_runner()
         llm_error = None
-        adk_live_text = None
+        adk_events = []
+        clean_topic = query_text.replace("Generate a podcast episode for:", "").strip()
 
         try:
-            # 1. Attempt live execution through the Google ADK Coordinator & Subagents
-            adk_res = asyncio.run(runner.run_debug(clean_topic))
-            adk_live_text = str(adk_res)
-            script_text = f"# 🎙️ Live Google ADK Podcast Episode: {clean_topic[:45]}\n\n{adk_live_text}"
+            # 1. Handle Tool Confirmation explicitly sent from UI
+            if confirmation_data:
+                fc_id = confirmation_data.get("call_id")
+                confirmed = confirmation_data.get("confirmed", True)
+                fr_part = types.Part(function_response=types.FunctionResponse(
+                    name=REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
+                    id=fc_id,
+                    response={"confirmed": confirmed}
+                ))
+                async def _send_tool_confirmation():
+                    results = []
+                    async for ev in runner.run_async(
+                        user_id="debug_user_id",
+                        session_id=session_id,
+                        new_message=types.UserContent(parts=[fr_part])
+                    ):
+                        results.append(ev)
+                    return results
+                adk_events = asyncio.run(_send_tool_confirmation())
+
+            # 2. Handle Human-in-the-Loop Script Approval (User approves draft script)
+            elif query_text.strip().lower() in ("approve", "looks good", "approve.", "proceed", "generate audio") or "approve" in query_text.lower():
+                # Step A: Inform the coordinator agent that the script is approved
+                turn2_events = asyncio.run(runner.run_debug("Approve. Proceed with audio generation.", session_id=session_id))
+                adk_events.extend(turn2_events)
+
+                # Step B: Check if audio_producer_agent requested tool confirmation
+                conf_fc = None
+                for ev in turn2_events:
+                    if hasattr(ev, "get_function_calls"):
+                        for fc in ev.get_function_calls():
+                            if fc.name == REQUEST_CONFIRMATION_FUNCTION_CALL_NAME:
+                                conf_fc = fc
+                                break
+                    if conf_fc:
+                        break
+
+                # Step C: Auto-confirm since human explicitly approved audio generation!
+                if conf_fc:
+                    fr_part = types.Part(function_response=types.FunctionResponse(
+                        name=REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
+                        id=conf_fc.id,
+                        response={"confirmed": True}
+                    ))
+                    async def _run_post_confirmation():
+                        c_events = []
+                        async for ev in runner.run_async(
+                            user_id="debug_user_id",
+                            session_id=session_id,
+                            new_message=types.UserContent(parts=[fr_part])
+                        ):
+                            c_events.append(ev)
+                        return c_events
+                    turn3_events = asyncio.run(_run_post_confirmation())
+                    adk_events.extend(turn3_events)
+
+            # 3. Handle Standard Prompt or Revision Feedback
+            else:
+                adk_events = asyncio.run(runner.run_debug(clean_topic, session_id=session_id))
+
+            # Format the ADK events into structured markdown and extract telemetry
+            formatted_text, meta_info = format_adk_events(adk_events, session_id)
+            extra_meta = meta_info
             execution_mode = "live_google_adk_success"
             model_info = "gemini-3.1-flash-lite (Google ADK Live)"
+
         except Exception as e:
             llm_error = str(e)
             billing_blocked = "outstanding balance" in llm_error or "PERMISSION_DENIED" in llm_error
             execution_mode = "live_adk_billing_blocked" if billing_blocked else "adk_local_fallback"
             model_info = "gemini-3.1-flash-lite (Google AI Studio Billing Blocked)" if billing_blocked else "google_adk_local"
 
-            # 2. Formulate dynamic topic-specific podcast plan
+            # Formulate dynamic topic-specific podcast plan
             plan = PodcastPlan(
                 episode_title=f"The Frontier of AI: {clean_topic[:45]}",
                 target_audience="Engineers & Product Leaders",
@@ -219,28 +371,59 @@ def execute_agent_work(agent_name: str, query_text: str, context_id: Optional[st
                 turns=turns
             )
 
-            script_text = f"# 🎙️ Podcast Episode: {script.episode_title}\n\n"
+            script_text = f"🎙️ **Podcast Producer (Coordinator)**\n\nHere is the draft script for your review!\n\n**Episode Title: {script.episode_title}**\n\n"
             for t in script.turns:
-                script_text += f"**[{t.speaker}]**: {t.text}\n\n"
+                script_text += f"**{t.speaker}**: {t.text}\n\n"
+            script_text += "\n---\n\n**Please review the dialogue above and reply with one of the following:**\n• **APPROVE**: Reply 'Approve' to proceed with audio generation.\n• **EDIT / REVISE**: Reply with specific changes.\n• **RE-RESEARCH / REJECT**: Reply if you want to investigate a different angle."
 
-        # Package deliverable as an A2A Artifact containing script and execution telemetry
+            formatted_text = script_text
+            extra_meta = {
+                "hitl_required": True,
+                "hitl_prompt": script_text,
+                "script_content": script_text,
+                "tool_confirmation_required": False,
+                "confirmation_info": {},
+                "audio_file_info": None,
+                "session_id": session_id,
+            }
+
+        # Deliverable 1: Podcast Script Artifact
         artifacts.append(
             Artifact(
                 name="Podcast_Dialogue_Script.json",
-                parts=[Part(text=script_text)],
+                parts=[Part(text=formatted_text)],
                 metadata={
-                    "speaker_count": 2,
-                    "voice_cast": {"Alex": "en-US-GuyNeural", "Morgan": "en-US-JennyNeural"},
-                    "runtime_est_seconds": 90,
+                    "speaker_count": 2 if "3 Speakers" not in formatted_text else 3,
+                    "voice_cast": {"Alex": "en-US-GuyNeural", "Morgan": "en-US-JennyNeural", "Taylor": "en-GB-RyanNeural"},
                     "framework": "Google ADK (Agent Development Kit)",
                     "execution_mode": execution_mode,
                     "model": model_info,
+                    "session_id": session_id,
                     "llm_called": True,
-                    "llm_error": llm_error
+                    "llm_error": llm_error,
+                    "hitl_required": extra_meta.get("hitl_required", False)
                 }
             )
         )
-        return script_text, artifacts
+
+        # Deliverable 2: Generated Audio Artifact (if synthesized)
+        if extra_meta.get("audio_file_info"):
+            audio_info = extra_meta["audio_file_info"]
+            artifacts.append(
+                Artifact(
+                    name=audio_info["filename"],
+                    parts=[Part(text=f"Master Neural MP3 audio stream for {audio_info['filename']}")],
+                    metadata={
+                        "type": "audio/mp3",
+                        "audio_url": audio_info["url"],
+                        "filename": audio_info["filename"],
+                        "size_kb": audio_info["size_kb"],
+                        "framework": "Google ADK + Microsoft Neural TTS (edge-tts)"
+                    }
+                )
+            )
+
+        return formatted_text, artifacts, extra_meta
 
     else:
         raise ValueError(f"Unknown agent identifier: '{agent_name}'. Must be 'sql', 'rag', or 'podcast'.")
@@ -298,8 +481,8 @@ async def handle_jsonrpc(agent_name: str, payload: dict) -> dict:
 
         # 2. Execute internal agent logic in background worker thread to prevent event-loop blocking
         try:
-            content, artifacts = await asyncio.to_thread(
-                execute_agent_work, agent_name, user_text, context_id
+            content, artifacts, extra_meta = await asyncio.to_thread(
+                execute_agent_work, agent_name, user_text, context_id, params.get("confirmation")
             )
             
             # Construct outgoing agent message turn
@@ -310,12 +493,13 @@ async def handle_jsonrpc(agent_name: str, payload: dict) -> dict:
             )
             task.history.append(msg_out)
             task.artifacts.extend(artifacts)
-            task.status = "completed"
+            task.status = "input_required" if (extra_meta.get("hitl_required") or extra_meta.get("tool_confirmation_required")) and not extra_meta.get("audio_file_info") else "completed"
             task.updated_at = time.time()
         except Exception as e:
             task.status = "failed"
             task.error_message = str(e)
             task.updated_at = time.time()
+            extra_meta = {}
 
         # Update task in store
         TASK_STORE[task.id] = task
@@ -329,6 +513,12 @@ async def handle_jsonrpc(agent_name: str, payload: dict) -> dict:
                 "output": task.history[-1].parts[0].text if task.history[-1].parts else "",
                 "artifacts": [a.model_dump() for a in task.artifacts],
                 "task": task.model_dump(),
+                "hitl_required": extra_meta.get("hitl_required", False),
+                "hitl_info": extra_meta.get("hitl_prompt", ""),
+                "tool_confirmation_required": extra_meta.get("tool_confirmation_required", False),
+                "tool_confirmation_details": extra_meta.get("confirmation_info", {}),
+                "audio_info": extra_meta.get("audio_file_info"),
+                "session_id": context_id or extra_meta.get("session_id", task.id),
             },
             "id": req_id,
         }
@@ -415,11 +605,22 @@ def create_gateway_app() -> FastAPI:
         payload = await request.json()
         query = payload.get("query", "").strip()
         mode = payload.get("mode", "auto")
-        if not query:
-            raise HTTPException(status_code=400, detail="Query cannot be empty.")
+        context_id = payload.get("context_id") or payload.get("session_id")
+        action = payload.get("action")
+        confirmation = payload.get("confirmation")
+        
+        if not query and not confirmation:
+            raise HTTPException(status_code=400, detail="Query or confirmation cannot be empty.")
         
         base_url = str(request.base_url).rstrip("/")
-        return await route_and_execute(query=query, mode=mode, base_url=base_url)
+        return await route_and_execute(
+            query=query,
+            mode=mode,
+            base_url=base_url,
+            context_id=context_id,
+            action=action,
+            confirmation=confirmation
+        )
 
     # API Key Inspection and Hot-Update Endpoint
     @app.get("/api/key-status")
@@ -433,7 +634,7 @@ def create_gateway_app() -> FastAPI:
         from google import genai
         try:
             client = genai.Client()
-            client.models.generate_content(model="gemini-2.5-flash", contents="ping")
+            client.models.generate_content(model="gemini-3.1-flash-lite", contents="ping")
             return {"status": "active", "masked": masked, "message": "Gemini API key is active and live calls are functional."}
         except Exception as e:
             err_str = str(e)
@@ -509,6 +710,27 @@ def create_gateway_app() -> FastAPI:
     ui_dir = PROJECT_ROOT / "ui"
     if ui_dir.exists():
         app.mount("/ui", StaticFiles(directory=str(ui_dir), html=True), name="ui")
+
+    # Mount Generated Podcast Audio Directory
+    audio_dir = PROJECT_ROOT / "podcast_agent" / "output"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/audio", StaticFiles(directory=str(audio_dir)), name="audio")
+
+    @app.get("/api/audio-list")
+    def api_audio_list():
+        if not audio_dir.exists():
+            return {"files": []}
+        files = []
+        for p in audio_dir.glob("*.mp3"):
+            st = p.stat()
+            files.append({
+                "filename": p.name,
+                "url": f"/audio/{p.name}",
+                "size_kb": round(st.st_size / 1024, 1),
+                "mtime": st.st_mtime
+            })
+        files.sort(key=lambda x: x["mtime"], reverse=True)
+        return {"files": files}
 
     @app.get("/.well-known/agent-card.json")
     def get_root_agent_card(request: Request):

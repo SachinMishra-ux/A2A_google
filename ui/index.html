@@ -121,7 +121,10 @@
       <!-- Output Card -->
       <section class="output-card">
         <div class="output-header">
-          <h3>Generated Output</h3>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <h3>Generated Output</h3>
+            <span id="session-badge" class="session-badge" style="display:none;"></span>
+          </div>
           <span id="output-runtime" style="font-size:0.8rem; color:var(--g-muted);">Ready</span>
         </div>
 
@@ -159,6 +162,92 @@ Enter a prompt above or click one of the quick suggestions. The A2A protocol wil
 3. Dispatch a standard JSON-RPC 2.0 request (`message/send` / `tasks/create`).
 4. Execute the real specialist agent runtime (LangChain / Google ADK).
 5. Stream step-by-step telemetry, artifacts, and protocol payloads in real time on the right!
+        </div>
+
+        <!-- Human-in-the-Loop (HITL) Interactive Decision Panel -->
+        <div id="hitl-box" class="hitl-panel" style="display:none;">
+          <div class="hitl-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="hitl-pulse-dot"></span>
+              <strong>Human-in-the-Loop Review Gate (Step 4)</strong>
+            </div>
+            <span class="hitl-badge">Awaiting Your Input</span>
+          </div>
+          <p class="hitl-desc">
+            The <code>podcast_agent</code> coordinator has paused the pipeline for human review. Please inspect the draft script above and choose an action:
+          </p>
+          
+          <div class="hitl-actions">
+            <button id="btn-hitl-approve" class="hitl-btn btn-approve">
+              <span>🟢 Approve Script &amp; Synthesize Audio</span>
+            </button>
+            <button id="btn-hitl-revise" class="hitl-btn btn-revise">
+              <span>✏️ Request Revisions</span>
+            </button>
+            <button id="btn-hitl-reject" class="hitl-btn btn-reject">
+              <span>🔄 Re-Research / Different Topic</span>
+            </button>
+          </div>
+
+          <!-- Revision & Feedback Input -->
+          <div id="hitl-feedback-container" class="hitl-feedback-wrap" style="display:none;">
+            <div style="font-size:0.82rem; font-weight:500; color:var(--g-dark); margin-bottom:6px;">
+              Quick Revision Suggestions (click to prefill):
+            </div>
+            <div class="revision-chips">
+              <span class="rev-chip" data-text="Make Morgan more critical and skeptical of the claims.">Critique Morgan</span>
+              <span class="rev-chip" data-text="Shorten dialogue turn 2 to make it punchier and faster-paced.">Shorten Turn 2</span>
+              <span class="rev-chip" data-text="Add Taylor as a 3rd speaker to bring in a devil's advocate perspective.">Add Taylor (3rd Speaker)</span>
+              <span class="rev-chip" data-text="Include more concrete statistics, market figures, and real-world metrics.">More Data &amp; Metrics</span>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <textarea id="hitl-custom-input" class="hitl-textarea" placeholder="Type your revision or follow-up feedback for the agent..." rows="2"></textarea>
+              <button id="btn-hitl-send" class="hitl-submit-btn">Send Feedback</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Google ADK Native Tool Confirmation Gate -->
+        <div id="tool-confirm-box" class="tool-confirm-panel" style="display:none;">
+          <div class="tool-confirm-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span>🛡️</span>
+              <strong>Google ADK Tool Confirmation Gate</strong>
+            </div>
+            <span class="tool-confirm-badge">Execution Intercepted</span>
+          </div>
+          <p id="tool-confirm-hint" style="font-size:0.85rem; color:var(--g-dark); margin:6px 0;">
+            Tool requires explicit user confirmation before executing neural synthesis.
+          </p>
+          <div class="tool-meta-box">
+            <div><strong>Tool:</strong> <code id="tool-name-label">generate_podcast_audio</code></div>
+            <div><strong>Call ID:</strong> <span id="tool-call-id-label" style="font-family:monospace; font-size:0.8rem;"></span></div>
+          </div>
+          <div style="display:flex; gap:10px; margin-top:10px;">
+            <button id="btn-confirm-tool" class="hitl-btn btn-approve" style="flex:1;">
+              ✓ Confirm &amp; Execute Tool
+            </button>
+            <button id="btn-reject-tool" class="hitl-btn btn-reject" style="flex:1;">
+              ✕ Reject Tool Invocation
+            </button>
+          </div>
+        </div>
+
+        <!-- Master Podcast Audio Player -->
+        <div id="audio-player-box" class="audio-player-panel" style="display:none;">
+          <div class="audio-player-header">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.3rem;">🎙️</span>
+              <div>
+                <strong id="audio-episode-title" style="font-size:0.95rem;">Podcast Episode Audio</strong>
+                <p id="audio-meta-text" style="font-size:0.75rem; color:var(--g-muted); margin:0;">Synthesized with Neural Multi-Speaker Voices</p>
+              </div>
+            </div>
+            <a id="audio-download-btn" class="audio-download-btn" href="#" download="podcast_episode.mp3">
+              ⬇ Download MP3
+            </a>
+          </div>
+          <audio id="master-audio-element" class="master-audio-element" controls preload="metadata"></audio>
         </div>
 
         <!-- Artifacts Section -->
