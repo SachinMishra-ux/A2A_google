@@ -10,54 +10,44 @@ The `a2a/` folder is designed in strict **layered architectural levels**, moving
 
 ```mermaid
 flowchart TD
-    subgraph Level_0["Level 0: Foundation & Schema Protocol"]
-        M["models.py<br/><i>(Canonical A2A v1.0 & JSON-RPC 2.0 Models)</i>"]
+    %% Tiers with transparent backgrounds for 100% Dark and Light theme compatibility
+    subgraph Tier1 ["Tier 1: Protocol & Schema Foundation"]
+        M["<b>models.py</b><br/>Canonical A2A v1.0 & JSON-RPC 2.0 Schemas"]
+        AC["<b>agent_cards.py</b><br/>Capability Manifests & Skill Declarations"]
     end
 
-    subgraph Level_1["Level 1: Agent Metadata & Discovery"]
-        AC["agent_cards.py<br/><i>(Capability Manifests & Skill Declarations)</i>"]
-        CARDS["cards/*.json<br/><i>(Static JSON Exported Cards)</i>"]
+    subgraph Tier2 ["Tier 2: Transport & Communication Layer"]
+        SRV["<b>server.py</b><br/>FastAPI JSON-RPC 2.0 Protocol Host"]
+        CLI["<b>client.py</b><br/>HTTP Inter-Agent Client"]
+        RTR["<b>router.py</b><br/>Intent Matcher & UI Telemetry Collector"]
     end
 
-    subgraph Level_2["Level 2: Transport & Host Engine"]
-        SRV["server.py<br/><i>(FastAPI JSON-RPC 2.0 Protocol Server)</i>"]
+    subgraph Tier3 ["Tier 3: Multi-Agent Orchestration & CLI"]
+        ORCH["<b>orchestrator.py</b><br/>Cross-Agent Collaborative Pipeline"]
+        MAIN["<b>main.py</b><br/>Unified Terminal CLI Entry Point"]
+        INIT["<b>__init__.py</b><br/>Public Package Exports"]
     end
 
-    subgraph Level_3["Level 3: Inter-Agent Communication"]
-        CLI["client.py<br/><i>(A2A HTTP Client for Agent-to-Agent calls)</i>"]
-    end
-
-    subgraph Level_4["Level 4: Intelligent Intent Routing"]
-        RTR["router.py<br/><i>(Capability Matcher, Dispatcher & UI Tracer)</i>"]
-    end
-
-    subgraph Level_5["Level 5: Multi-Agent Collaboration"]
-        ORCH["orchestrator.py<br/><i>(End-to-End 3-Agent Collaborative Workflow)</i>"]
-    end
-
-    subgraph Level_6["Level 6: Entry Points & Public API"]
-        MAIN["main.py<br/><i>(CLI Entry Point for Testing & Server Launch)</i>"]
-        INIT["__init__.py<br/><i>(Public Module Exports)</i>"]
-    end
-
-    %% Dependencies
+    %% Clean hierarchy connections
     M --> AC
-    AC --> CARDS
     M --> SRV
-    AC --> SRV
     M --> CLI
+    AC --> SRV
     AC --> RTR
     CLI --> RTR
-    M --> RTR
     CLI --> ORCH
     AC --> ORCH
     SRV --> MAIN
     ORCH --> MAIN
     RTR --> MAIN
-    M --> INIT
-    CLI --> INIT
-    SRV --> INIT
-    RTR --> INIT
+    INIT -.-> SRV
+
+    %% Universal High-Contrast Theme Styling (Works in both Dark and Light modes)
+    style Tier1 fill:none,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 4
+    style Tier2 fill:none,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 4
+    style Tier3 fill:none,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 4
+
+    classDef default fill:#1e293b,stroke:#38bdf8,stroke-width:1.5px,color:#ffffff;
 ```
 
 ---
@@ -66,16 +56,16 @@ flowchart TD
 
 When building an enterprise multi-agent protocol system, files cannot be created randomly. They follow a **bottom-up dependency order**:
 
-| Sequence | File Name | Role & Architectural Purpose | Why It Came First |
-| :---: | :--- | :--- | :--- |
-| **Step 1** | **`models.py`** | **The Canonical Data Schema**<br/>Defines all Pydantic models for JSON-RPC 2.0 (`JSONRPCRequest`, `JSONRPCResponse`, `JSONRPCError`) and A2A objects (`AgentCard`, `AgentSkill`, `Task`, `TaskStatus`, `Message`, `Artifact`). | **Foundational Zero-Dependency Rule**: Every other component (server, client, router, orchestrator) must serialize and deserialize standard A2A objects. Without schemas, nothing else can be typed. |
-| **Step 2** | **`agent_cards.py`** | **Agent Capability Manifests**<br/>Defines the official Agent Cards for the 3 agents (`sql_database_agent`, `rag_knowledge_agent`, `podcast_studio_agent`) and the Gateway. | **Contract First**: In A2A, an agent cannot be discovered or invoked until its Agent Card (skills, input/output modes, interfaces) is declared. |
-| **Step 3** | **`server.py`** | **The Protocol Host & Gateway**<br/>FastAPI server exposing `GET /.well-known/agent-card.json` and `POST /a2a` (handling `message/send`, `tasks/create`, `tasks/get`). Mounts the real agents. | **Server before Client**: You must have a server endpoint listening for JSON-RPC requests before you can write a client to communicate with it. |
-| **Step 4** | **`client.py`** | **The A2A HTTP Client**<br/>Reusable Python client used by any agent to query another agent over JSON-RPC 2.0 without knowing the other agent's internal language or framework. | **Agent Independence**: Enables an ADK agent to talk to a LangChain agent using pure HTTP/JSON-RPC without importing the other agent's internal Python packages. |
-| **Step 5** | **`router.py`** | **Intelligent Routing & Telemetry**<br/>Compares user queries against all registered Agent Cards, picks the best specialist agent, dispatches the task, and records trace milestones for the UI. | **Orchestration Layer**: Sits between external incoming queries and the specialized agents, ensuring queries reach the right agent automatically. |
-| **Step 6** | **`orchestrator.py`** | **Federated Collaboration Pipeline**<br/>Implements cross-agent workflows where SQL, RAG, and Podcast agents collaborate sequentially to build a podcast episode. | **Composite Workflow**: Requires all agents, cards, client, and server to already exist so it can demonstrate multi-agent chaining. |
-| **Step 7** | **`main.py`** | **CLI Entry Point**<br/>Command-line interface to launch the server, run the multi-agent demo, inspect cards, or query individual agents. | **User & DevOps Interface**: Glues together all previous modules into executable terminal commands. |
-| **Step 8** | **`__init__.py`** | **Package Interface**<br/>Cleanly exports `A2AClient`, `AgentCard`, `Task`, `create_gateway_app`, and `A2ARouter`. | **Packaging**: Standard Python convention allowing external packages (e.g. `entrypoint.py`, `ui/run.py`) to import from `a2a`. |
+|     Sequence     | File Name                     | Role & Architectural Purpose                                                                                                                                                                                                                      | Why It Came First                                                                                                                                                                                          |
+| :--------------: | :---------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Step 1** | **`models.py`**       | **The Canonical Data Schema**Defines all Pydantic models for JSON-RPC 2.0 (`JSONRPCRequest`, `JSONRPCResponse`, `JSONRPCError`) and A2A objects (`AgentCard`, `AgentSkill`, `Task`, `TaskStatus`, `Message`, `Artifact`). | **Foundational Zero-Dependency Rule**: Every other component (server, client, router, orchestrator) must serialize and deserialize standard A2A objects. Without schemas, nothing else can be typed. |
+| **Step 2** | **`agent_cards.py`**  | **Agent Capability Manifests**Defines the official Agent Cards for the 3 agents (`sql_database_agent`, `rag_knowledge_agent`, `podcast_studio_agent`) and the Gateway.                                                                | **Contract First**: In A2A, an agent cannot be discovered or invoked until its Agent Card (skills, input/output modes, interfaces) is declared.                                                      |
+| **Step 3** | **`server.py`**       | **The Protocol Host & Gateway**FastAPI server exposing `GET /.well-known/agent-card.json` and `POST /a2a` (handling `message/send`, `tasks/create`, `tasks/get`). Mounts the real agents.                                         | **Server before Client**: You must have a server endpoint listening for JSON-RPC requests before you can write a client to communicate with it.                                                      |
+| **Step 4** | **`client.py`**       | **The A2A HTTP Client**Reusable Python client used by any agent to query another agent over JSON-RPC 2.0 without knowing the other agent's internal language or framework.                                                                  | **Agent Independence**: Enables an ADK agent to talk to a LangChain agent using pure HTTP/JSON-RPC without importing the other agent's internal Python packages.                                     |
+| **Step 5** | **`router.py`**       | **Intelligent Routing & Telemetry**Compares user queries against all registered Agent Cards, picks the best specialist agent, dispatches the task, and records trace milestones for the UI.                                                 | **Orchestration Layer**: Sits between external incoming queries and the specialized agents, ensuring queries reach the right agent automatically.                                                    |
+| **Step 6** | **`orchestrator.py`** | **Federated Collaboration Pipeline**Implements cross-agent workflows where SQL, RAG, and Podcast agents collaborate sequentially to build a podcast episode.                                                                                | **Composite Workflow**: Requires all agents, cards, client, and server to already exist so it can demonstrate multi-agent chaining.                                                                  |
+| **Step 7** | **`main.py`**         | **CLI Entry Point**Command-line interface to launch the server, run the multi-agent demo, inspect cards, or query individual agents.                                                                                                        | **User & DevOps Interface**: Glues together all previous modules into executable terminal commands.                                                                                                  |
+| **Step 8** | **`__init__.py`**     | **Package Interface**Cleanly exports `A2AClient`, `AgentCard`, `Task`, `create_gateway_app`, and `A2ARouter`.                                                                                                                     | **Packaging**: Standard Python convention allowing external packages (e.g. `entrypoint.py`, `ui/run.py`) to import from `a2a`.                                                                 |
 
 ---
 
@@ -92,28 +82,28 @@ sequenceDiagram
     participant Cards as Agent Cards (agent_cards.py)
     participant Client as A2A Client (client.py)
     participant Specialist as Specialist Agent (SQL / RAG / Podcast)
-    
+  
     User->>WebServer: POST /api/route {"query": "Show users in database"}
     WebServer->>Router: route_and_execute(query)
-    
+  
     Note over Router,Cards: Step 1: Capability Matching
     Router->>Cards: Inspect registered Agent Cards & Skills
     Cards-->>Router: Cards for SQL, RAG, Podcast
     Router->>Router: Evaluate match scores (SQL matches "users", "database" -> 70%)
-    
+  
     Note over Router,Client: Step 2: Task Dispatch
     Router->>Client: send_message(agent="sql", query)
     Client->>WebServer: POST /sql/a2a (JSON-RPC 2.0 "message/send")
-    
+  
     Note over WebServer,Specialist: Step 3: Execution & Governance
     WebServer->>Specialist: Invoke LangChain / LangGraph Agent
     Specialist->>Specialist: Run Query + HITL Check + Redact PII
     Specialist-->>WebServer: Execution Result + Artifacts
-    
+  
     Note over WebServer,Router: Step 4: JSON-RPC Response
     WebServer-->>Client: 200 OK {"jsonrpc":"2.0", "result":{"taskId":"...", "output":"...", "artifacts":[...]}}
     Client-->>Router: Parsed A2A Task Deliverable
-    
+  
     Note over Router,User: Step 5: UI & Telemetry Rendering
     Router-->>WebServer: Return Result + Evaluation Matrix + Steps Timeline
     WebServer-->>User: HTTP 200 (Result text + Behind-the-Scenes Trace Inspector)
@@ -124,6 +114,7 @@ sequenceDiagram
 ## 4. Deep-Dive into Each File in `a2a/`
 
 ### 1. `models.py` (The Canonical Protocol Schema)
+
 * **What it does**: Implements the official Linux Foundation / Google Agent-to-Agent (A2A) v1.0 data standard using Pydantic.
 * **Key Classes**:
   * `JSONRPCRequest`: Standard JSON-RPC 2.0 request (`jsonrpc: "2.0"`, `method`, `params`, `id`).
@@ -137,6 +128,7 @@ sequenceDiagram
 ---
 
 ### 2. `agent_cards.py` (The Capability Directory)
+
 * **What it does**: Defines the "Business Cards" for each agent so they can discover each other without prior hardcoded knowledge.
 * **Exported Cards**:
   * `SQL_AGENT_CARD`: Advertises `query_user_accounts` and `hitl_pii_governance` on endpoint `/sql/a2a`.
@@ -147,6 +139,7 @@ sequenceDiagram
 ---
 
 ### 3. `server.py` (The JSON-RPC 2.0 Server & Agent Host)
+
 * **What it does**: A high-performance FastAPI server that acts as the communication bus.
 * **Endpoints Exposed**:
   * `GET /.well-known/agent-card.json`: Standard discovery endpoint returning available agents and their skills.
@@ -162,6 +155,7 @@ sequenceDiagram
 ---
 
 ### 4. `client.py` (The A2A Inter-Agent Client)
+
 * **What it does**: Provides a clean, typed Python interface for calling any A2A-compliant server.
 * **Primary Methods**:
   * `discover_agent(base_url)`: Downloads and validates the remote agent's `agent-card.json`.
@@ -173,6 +167,7 @@ sequenceDiagram
 ---
 
 ### 5. `router.py` (The Query Router & Trace Collector)
+
 * **What it does**: Dynamically inspects the user's intent and routes it to the optimal agent while collecting diagnostic telemetry.
 * **How It Works**:
   1. Compares incoming query tokens against skill keywords and examples in each `AgentCard`.
@@ -183,6 +178,7 @@ sequenceDiagram
 ---
 
 ### 6. `orchestrator.py` (The Multi-Agent Collaboration Workflow)
+
 * **What it does**: Demonstrates real Agent-to-Agent delegation across completely different frameworks:
   * **Step 1**: Dispatches query to `SQL Agent` (LangChain) $\rightarrow$ retrieves audited account statistics.
   * **Step 2**: Dispatches query to `RAG Agent` (LangChain + FAISS) $\rightarrow$ retrieves technical knowledge and citations.
@@ -191,6 +187,7 @@ sequenceDiagram
 ---
 
 ### 7. `main.py` (The A2A Command-Line Interface)
+
 * **What it does**: The developer entry point for executing operations from the terminal.
 * **Supported Commands**:
   ```bash
@@ -218,39 +215,47 @@ Depending on how you run the application, the entry point differs:
 
 ```mermaid
 flowchart TD
-    subgraph Execution_Modes["Execution Modes"]
-        A["Docker Container<br/><code>docker compose up -d</code>"]
-        B["Local Web UI<br/><code>uv run python ui/run.py</code>"]
-        C["Local A2A CLI<br/><code>uv run python a2a/main.py</code>"]
+    subgraph Execution_Modes ["Execution Modes"]
+        A["<b>Docker Container</b><br/>docker compose up -d"]
+        B["<b>Local Web UI</b><br/>uv run python ui/run.py"]
+        C["<b>Local A2A CLI</b><br/>uv run python a2a/main.py"]
     end
 
-    subgraph Entrypoint_Files["Entry Point Script"]
-        EP["entrypoint.py<br/><i>(Pre-warms SQLite, FAISS & ADK)</i>"]
-        UIR["ui/run.py<br/><i>(Mounts Static Web UI)</i>"]
-        CLI["a2a/main.py<br/><i>(Terminal CLI)</i>"]
+    subgraph Entrypoint_Files ["Entry Point Script"]
+        EP["<b>entrypoint.py</b><br/>Pre-warms SQLite, FAISS & ADK"]
+        UIR["<b>ui/run.py</b><br/>Mounts Static Web UI"]
+        CLIS["<b>a2a/main.py</b><br/>Terminal CLI Runner"]
     end
 
-    subgraph Unified_Server["Core Gateway Engine"]
-        SRV["a2a/server.py<br/><code>create_gateway_app()</code>"]
+    subgraph Unified_Server ["Core Gateway Engine"]
+        SRV["<b>a2a/server.py</b><br/>create_gateway_app()"]
     end
 
     A --> EP
-    EP --> SRV
     B --> UIR
+    C --> CLIS
+    EP --> SRV
     UIR --> SRV
-    C --> CLI
-    CLI --> SRV
+    CLIS --> SRV
+
+    %% Universal High-Contrast Theme Styling (Works in both Dark and Light modes)
+    style Execution_Modes fill:none,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 4
+    style Entrypoint_Files fill:none,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 4
+    style Unified_Server fill:none,stroke:#64748b,stroke-width:1.5px,stroke-dasharray: 4 4
+
+    classDef default fill:#1e293b,stroke:#38bdf8,stroke-width:1.5px,color:#ffffff;
 ```
 
 1. **Production / Docker**:
+
    * Runs [`entrypoint.py`](file:///Users/sachinmishra/Desktop/A2A_google/entrypoint.py).
    * Automatically pre-warms all 3 agents (seeds SQLite, builds FAISS index, initializes ADK root coordinator).
    * Launches `create_gateway_app()` on `0.0.0.0:8000`.
-
 2. **Local Browser & UI**:
+
    * Runs [`ui/run.py`](file:///Users/sachinmishra/Desktop/A2A_google/ui/run.py).
    * Mounts the static UI files from [`ui/`](file:///Users/sachinmishra/Desktop/A2A_google/ui) and opens `http://localhost:8000/ui/`.
-
 3. **CLI Operations**:
+
    * Runs [`a2a/main.py`](file:///Users/sachinmishra/Desktop/A2A_google/a2a/main.py).
    * Allows testing individual agents or running the end-to-end multi-agent orchestrator demo.
