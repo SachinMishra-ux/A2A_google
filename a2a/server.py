@@ -464,7 +464,7 @@ def create_gateway_app() -> FastAPI:
         from google import genai
         try:
             client = genai.Client()
-            client.models.generate_content(model="gemini-2.5-flash", contents="ping")
+            client.models.generate_content(model="gemini-3.1-flash-lite", contents="ping")
             return {"success": True, "status": "active", "message": "API key successfully updated and verified live with Gemini!"}
         except Exception as e:
             return {"success": False, "status": "billing_blocked" if "PERMISSION_DENIED" in str(e) else "error", "message": str(e)}
