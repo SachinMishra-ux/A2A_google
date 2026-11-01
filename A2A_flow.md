@@ -12,20 +12,20 @@ The `a2a/` folder is designed in strict **layered architectural levels**, moving
 flowchart TD
     %% Tiers with transparent backgrounds for 100% Dark and Light theme compatibility
     subgraph Tier1 ["Tier 1: Protocol & Schema Foundation"]
-        M["<b>models.py</b><br/>Canonical A2A v1.0 & JSON-RPC 2.0 Schemas"]
-        AC["<b>agent_cards.py</b><br/>Capability Manifests & Skill Declarations"]
+        M["📄 File: models.py<br/>Canonical A2A v1.0 & JSON-RPC 2.0 Schemas"]
+        AC["📄 File: agent_cards.py<br/>Capability Manifests & Skill Declarations"]
     end
 
     subgraph Tier2 ["Tier 2: Transport & Communication Layer"]
-        SRV["<b>server.py</b><br/>FastAPI JSON-RPC 2.0 Protocol Host"]
-        CLI["<b>client.py</b><br/>HTTP Inter-Agent Client"]
-        RTR["<b>router.py</b><br/>Intent Matcher & UI Telemetry Collector"]
+        SRV["📄 File: server.py<br/>FastAPI JSON-RPC 2.0 Protocol Host"]
+        CLI["📄 File: client.py<br/>HTTP Inter-Agent Client"]
+        RTR["📄 File: router.py<br/>Intent Matcher & UI Telemetry Collector"]
     end
 
     subgraph Tier3 ["Tier 3: Multi-Agent Orchestration & CLI"]
-        ORCH["<b>orchestrator.py</b><br/>Cross-Agent Collaborative Pipeline"]
-        MAIN["<b>main.py</b><br/>Unified Terminal CLI Entry Point"]
-        INIT["<b>__init__.py</b><br/>Public Package Exports"]
+        ORCH["📄 File: orchestrator.py<br/>Cross-Agent Collaborative Pipeline"]
+        MAIN["📄 File: main.py<br/>Unified Terminal CLI Entry Point"]
+        INIT["📄 File: __init__.py<br/>Public Package Exports"]
     end
 
     %% Clean hierarchy connections
@@ -216,19 +216,19 @@ Depending on how you run the application, the entry point differs:
 ```mermaid
 flowchart TD
     subgraph Execution_Modes ["Execution Modes"]
-        A["<b>Docker Container</b><br/>docker compose up -d"]
-        B["<b>Local Web UI</b><br/>uv run python ui/run.py"]
-        C["<b>Local A2A CLI</b><br/>uv run python a2a/main.py"]
+        A["🐳 Docker Container<br/>docker compose up -d"]
+        B["🌐 Local Web UI<br/>uv run python ui/run.py"]
+        C["💻 Local A2A CLI<br/>uv run python a2a/main.py"]
     end
 
     subgraph Entrypoint_Files ["Entry Point Script"]
-        EP["<b>entrypoint.py</b><br/>Pre-warms SQLite, FAISS & ADK"]
-        UIR["<b>ui/run.py</b><br/>Mounts Static Web UI"]
-        CLIS["<b>a2a/main.py</b><br/>Terminal CLI Runner"]
+        EP["📄 File: entrypoint.py<br/>Pre-warms SQLite, FAISS & ADK"]
+        UIR["📄 File: ui/run.py<br/>Mounts Static Web UI"]
+        CLIS["📄 File: a2a/main.py<br/>Terminal CLI Runner"]
     end
 
     subgraph Unified_Server ["Core Gateway Engine"]
-        SRV["<b>a2a/server.py</b><br/>create_gateway_app()"]
+        SRV["⚙️ Engine: a2a/server.py<br/>create_gateway_app()"]
     end
 
     A --> EP
